@@ -11,11 +11,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options(-Wall -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always
-    -ftls-model=initial-exec -Wundef -Wcast-qual -Wwrite-strings -Wno-format-nonliteral)
+    -ftls-model=initial-exec -Wno-undef -Wcast-qual -Wwrite-strings -Wno-format-nonliteral)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     add_compile_options(-Werror -Wimplicit-fallthrough -Wno-deprecated-copy -Wno-address-of-packed-member
-        -Wno-expansion-to-defined -Wno-undef -Wno-unused-private-field -Wno-deprecated-volatile)
+        -Wno-expansion-to-defined -Wno-unused-private-field -Wno-deprecated-volatile)
 endif()
 
 ###############
@@ -23,6 +23,8 @@ endif()
 
 # Should dependencies be pulled via fetch content?
 option(EXPECT_DEPENDENCIES_LOCAL "When set, expect that most dependencies are installed on the system rather than fetching them ourselves." OFF)
+# Should tests be built?
+option(BUILD_TESTS "Build tests" OFF)
 
 ###############
 # Find our dependencies
@@ -41,6 +43,7 @@ link_directories(${PKG_LIBEVENT_LIBRARY_DIRS})
 if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
     find_package(plog REQUIRED)
+    find_package(CryptoPP REQUIRED)
 else()
     FetchContent_Declare(
         fmt
@@ -59,8 +62,12 @@ else()
         GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
         GIT_TAG        v3.2.0
     )
+    FetchContent_Declare(
+        CryptoPP
+        GIT_REPOSITORY  https://github.com/abdes/cryptopp-cmake.git
+    )
 
-    FetchContent_MakeAvailable(fmt plog tomlplusplus)
+    FetchContent_MakeAvailable(fmt plog tomlplusplus CryptoPP)
 endif()
 
 ###############
@@ -80,12 +87,14 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/Sources/version.c.in ${VERSION_FILE} @O
 # main daemon (blazed) target
 add_executable(daemon
     ${VERSION_FILE}
+    Sources/Main.cpp
+    Sources/misc/Logging.cpp
 )
 
-target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
-target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include/daemon)
+target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
+target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
 target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt
-    tomlplusplus::tomlplusplus)
+    tomlplusplus::tomlplusplus cryptopp::cryptopp)
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
@@ -102,3 +111,15 @@ endif()
 # installation target
 set_target_properties(daemon PROPERTIES OUTPUT_NAME blazed)
 INSTALL(TARGETS daemon RUNTIME DESTINATION /usr/sbin)
+
+###############
+# Include tests, if enabled
+if(${BUILD_TESTS})
+    # fetch testing library (catch2)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.1.0
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
