@@ -143,7 +143,7 @@ void EventLoop::run() {
  * @brief Handle a signal that indicates the process should terminate
  */
 void EventLoop::handleTermination() {
-    PLOG_WARNING << "Received signal, terminating...";
+    PLOG_WARNING << "Received signal, terminating…";
 
     // break out of the main loop and initiate shutdown
     gRun = false;

@@ -10,6 +10,7 @@
 #include <string>
 
 #include "version.h"
+#include "Config/Reader.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -101,27 +102,32 @@ static void RunMainLoop() {
  * @brief Daemon entry point
  */
 int main(int argc, char **argv) {
-    // parse args, set up logging
+    // early init: parse args and set up logging
     try {
         ParseArgs(argc, argv);
     } catch(const std::exception &e) {
-        std::cerr << "failed to parse arguments: " << e.what() << std::endl;
+        std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
         return -1;
     }
 
     Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
-    PLOG_INFO << "blazed version " << kVersion << " (" << kVersionGitHash << ")";
+    PLOG_INFO << "Starting blazed version " << kVersion << " (" << kVersionGitHash << ")";
 
-    // set up the rest of the daemon
+    // initialize the event loop, then read config (which may attach of event sources)
     gMainLoop = std::make_shared<Support::EventLoop>(true);
 
-    // TODO: parse config file
+    try {
+        Config::Read(gCliConfig.configFilePath);
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Failed to parse config file: " << e.what();
+        return -2;
+    }
 
     // run the event loop on the main thread
     RunMainLoop();
 
     // clean up
-    PLOG_DEBUG << "shutting down";
+    PLOG_DEBUG << "Shutting down…";
 
     gMainLoop.reset();
 }

@@ -1,6 +1,6 @@
 ####################################################################################################
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(coordinatord VERSION 1.0 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
+project(coordinatord VERSION 0.1 LANGUAGES C CXX)
 
 include(ExternalProject)
 include(FetchContent)
@@ -21,8 +21,8 @@ endif()
 ###############
 # Configuration options
 
-# Should dependencies be pulled via fetch content?
-option(EXPECT_DEPENDENCIES_LOCAL "When set, expect that most dependencies are installed on the system rather than fetching them ourselves." OFF)
+# Should dependencies be pulled via fetch content, or do we expect they're on the system already?
+option(EXPECT_DEPENDENCIES_LOCAL "Get dependencies from the system instead of fetching" OFF)
 # Should tests be built?
 option(BUILD_TESTS "Build tests" OFF)
 
@@ -88,6 +88,7 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/Sources/version.c.in ${VERSION_FILE} @O
 add_executable(daemon
     ${VERSION_FILE}
     Sources/Main.cpp
+    Sources/Config/Reader.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
@@ -126,4 +127,8 @@ if(${BUILD_TESTS})
         GIT_TAG        v3.1.0
     )
     FetchContent_MakeAvailable(Catch2)
+
+    # set up catch2 and test targets
+    include(CTest)
+    include(Catch)
 endif()
