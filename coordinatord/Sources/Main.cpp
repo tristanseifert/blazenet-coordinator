@@ -4,38 +4,55 @@
 
 #include <atomic>
 #include <filesystem>
+#include <memory>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #include "version.h"
-#include "misc/Logging.h"
+#include "Support/EventLoop.h"
+#include "Support/Logging.h"
+#include "Support/Watchdog.h"
 
 /// Set for as long as we should continue processing requests
 std::atomic_bool gRun{true};
+/// Main run loop
+static std::shared_ptr<Support::EventLoop> gMainLoop;
+
+/// Command line configuration
+static struct {
+    /// Path to the daemon config file
+    std::filesystem::path configFilePath;
+
+    /// Logging severity ([-3, 2] where 2 shows the most messages and -3 the least)
+    int logLevel{0};
+    /// Use the short log format (omit timestamps)
+    bool logShortFormat{false};
+} gCliConfig;
+
 
 
 /**
- * @brief Daemon entry point
+ * @brief Parse the command line
+ *
+ * @throw std::runtime_error When an option is incorrect
  */
-int main(int argc, char **argv) {
-    std::string confPath;
-    int logLevel{0};
-    bool logSimple{false};
-
-    // parse the command line
+static void ParseArgs(const int argc, char **argv) {
     int c;
+
+    const static struct option options[] = {
+        // config file
+        {"config",                  required_argument, 0, 0},
+        // log severity
+        {"log-level",               optional_argument, 0, 0},
+        // log style (simple = no timestamps, for systemd/syslog use)
+        {"log-simple",              no_argument, 0, 0},
+        {nullptr,                   0, 0, 0},
+    };
+
+    // loop as long as there's options to process
     while(1) {
         int index{0};
-        const static struct option options[] = {
-            // config file
-            {"config",                  required_argument, 0, 0},
-            // log severity
-            {"log-level",               optional_argument, 0, 0},
-            // log style (simple = no timestamps, for systemd/syslog use)
-            {"log-simple",              no_argument, 0, 0},
-            {nullptr,                   0, 0, 0},
-        };
-
         c = getopt_long_only(argc, argv, "", options, &index);
 
         // end of options
@@ -45,33 +62,66 @@ int main(int argc, char **argv) {
         // long option (based on index)
         else if(!c) {
             if(index == 0) {
-                confPath = optarg;
+                gCliConfig.configFilePath = optarg;
             }
             // log verbosity (centered around warning level)
             else if(index == 1) {
-                logLevel = strtol(optarg, nullptr, 10);
+                gCliConfig.logLevel = strtol(optarg, nullptr, 10);
             }
             // use simple log format
             else if(index == 2) {
-                logSimple = true;
+                gCliConfig.logShortFormat = true;
             }
         }
     }
 
-    if(confPath.empty()) {
-        std::cerr << "you must specify a config file (--config)" << std::endl;
+    // validate the parsed options
+    if(gCliConfig.configFilePath.empty()) {
+        throw std::runtime_error("You must specify a config file (--config)");
+    }
+    else if(gCliConfig.logLevel < -3 || gCliConfig.logLevel > 2) {
+        throw std::runtime_error("Invalid log level (must be [-3, 2])");
+    }
+}
+
+/**
+ * @brief Run the deamon's main loop
+ */
+static void RunMainLoop() {
+    Support::Watchdog::Start();
+
+    while(gRun) {
+        gMainLoop->run();
+    }
+
+    Support::Watchdog::Stop();
+}
+
+/**
+ * @brief Daemon entry point
+ */
+int main(int argc, char **argv) {
+    // parse args, set up logging
+    try {
+        ParseArgs(argc, argv);
+    } catch(const std::exception &e) {
+        std::cerr << "failed to parse arguments: " << e.what() << std::endl;
         return -1;
     }
 
-    // do set up
-    Support::InitLogging(logLevel, logSimple);
+    Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
     PLOG_INFO << "blazed version " << kVersion << " (" << kVersionGitHash << ")";
 
+    // set up the rest of the daemon
+    gMainLoop = std::make_shared<Support::EventLoop>(true);
+
+    // TODO: parse config file
+
     // run the event loop on the main thread
-    while(gRun) {
-        // TODO: implement
-    }
+    RunMainLoop();
 
     // clean up
     PLOG_DEBUG << "shutting down";
+
+    gMainLoop.reset();
 }

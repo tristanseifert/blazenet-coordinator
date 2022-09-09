@@ -12,7 +12,7 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Init.h>
 
-#include "misc/Logging.h"
+#include "Support/Logging.h"
 
 using namespace Support;
 
@@ -83,10 +83,10 @@ static void InitLibevent() {
  * @param level What level messages to output ([-3, 2]) where 2 is the most
  * @param simple When set, no timestamp/function name info is printed
  */
-void Support::InitLogging(const int level, const bool simple) {
+void Support::InitLogging(const int level, const bool simple) noexcept {
     plog::Severity logLevel{plog::Severity::info};
 
-    switch(level) {
+    switch(std::max(std::min(level, 2), -3)) {
         case -3:
             logLevel = plog::Severity::fatal;
             break;
@@ -105,9 +105,6 @@ void Support::InitLogging(const int level, const bool simple) {
         case 2:
             logLevel = plog::Severity::verbose;
             break;
-
-        default:
-            throw std::runtime_error("invalid log level: must be [-3, 2]");
     }
 
     InitPlog(logLevel, simple);

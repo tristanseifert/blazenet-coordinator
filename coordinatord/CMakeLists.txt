@@ -88,7 +88,9 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/Sources/version.c.in ${VERSION_FILE} @O
 add_executable(daemon
     ${VERSION_FILE}
     Sources/Main.cpp
-    Sources/misc/Logging.cpp
+    Sources/Support/EventLoop.cpp
+    Sources/Support/Logging.cpp
+    Sources/Support/Watchdog.cpp
 )
 
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
@@ -106,6 +108,8 @@ if(UNIX AND NOT APPLE)
 
     target_include_directories(daemon PRIVATE ${PKG_SYSTEMD_INCLUDE_DIRS})
     target_link_libraries(daemon PUBLIC ${PKG_SYSTEMD_LIBRARIES})
+
+    target_compile_definitions(daemon PRIVATE -DCONFIG_WITH_SYSTEMD)
 endif()
 
 # installation target
