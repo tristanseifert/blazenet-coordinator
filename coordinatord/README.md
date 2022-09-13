@@ -6,10 +6,10 @@ At a minimum, the following libraries _must_ be present on the system, and finda
 
 - SQLite3
 - libevent2
+- OpenSSL (at least 3.0.5)
 
 Additionally, the following libraries are also used by the coordinator software, but may be automagically acquired by the build process:
 
-- crypto++
 - glog
 - libfmt
 - toml++

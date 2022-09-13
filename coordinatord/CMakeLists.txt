@@ -33,6 +33,8 @@ find_package(PkgConfig REQUIRED)
 # libraries always expected to be installed on the system
 find_package(SQLite3 REQUIRED)
 
+find_package(OpenSSL REQUIRED)
+
 pkg_search_module(PKG_LIBCBOR REQUIRED libcbor)
 link_directories(${PKG_LIBCBOR_LIBRARY_DIRS})
 
@@ -43,7 +45,6 @@ link_directories(${PKG_LIBEVENT_LIBRARY_DIRS})
 if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
     find_package(plog REQUIRED)
-    find_package(CryptoPP REQUIRED)
 else()
     FetchContent_Declare(
         fmt
@@ -62,12 +63,8 @@ else()
         GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
         GIT_TAG        v3.2.0
     )
-    FetchContent_Declare(
-        CryptoPP
-        GIT_REPOSITORY  https://github.com/abdes/cryptopp-cmake.git
-    )
 
-    FetchContent_MakeAvailable(fmt plog tomlplusplus CryptoPP)
+    FetchContent_MakeAvailable(fmt plog tomlplusplus)
 endif()
 
 ###############
@@ -96,8 +93,8 @@ add_executable(daemon
 
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
-target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt
-    tomlplusplus::tomlplusplus cryptopp::cryptopp)
+target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt OpenSSL::SSL
+    OpenSSL::Crypto tomlplusplus::tomlplusplus)
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
