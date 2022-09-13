@@ -11,7 +11,7 @@ using namespace Support;
 bool Watchdog::gIsActive{false};
 std::chrono::microseconds Watchdog::gInterval;
 
-#ifdef CONF_WITH_SYSTEMD
+#ifdef CONFIG_WITH_SYSTEMD
 /*
  * Linux-specific systemd watchdog implementation
  */

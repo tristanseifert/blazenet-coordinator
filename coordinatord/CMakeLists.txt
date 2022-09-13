@@ -14,7 +14,7 @@ add_compile_options(-Wall -Wmissing-declarations -Wformat=2 -fdiagnostics-color=
     -ftls-model=initial-exec -Wno-undef -Wcast-qual -Wwrite-strings -Wno-format-nonliteral)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    add_compile_options(-Werror -Wimplicit-fallthrough -Wno-deprecated-copy -Wno-address-of-packed-member
+    add_compile_options(-Wimplicit-fallthrough -Wno-deprecated-copy -Wno-address-of-packed-member
         -Wno-expansion-to-defined -Wno-unused-private-field -Wno-deprecated-volatile)
 endif()
 
@@ -45,6 +45,7 @@ link_directories(${PKG_LIBEVENT_LIBRARY_DIRS})
 if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
     find_package(plog REQUIRED)
+    find_package(tomlplusplus REQUIRED)
 else()
     FetchContent_Declare(
         fmt
