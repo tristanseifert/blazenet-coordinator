@@ -1,0 +1,51 @@
+// Archivo (headings, variable)
+@font-face {
+    font-family: 'Archivo';
+    src: url('/fonts/Archivo[wdth,wght].woff2') format('woff2-variations'),
+        url('/fonts/Archivo.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Archivo';
+    src: url('/fonts/Archivo-Italic[wdth,wght].woff2') format('woff2-variations'),
+        url('/fonts/Archivo-Italic.woff2') format('woff2');
+
+    font-weight: normal;
+    font-style: italic;
+}
+
+// Inter (body font; supports regular and italic with the same font)
+/*
+* TODO: likely needs a hack to work:
+* { font-variation-settings: "slnt" 0deg }
+    .italic { font-variation-settings: "slnt" 10deg }
+*/
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/Inter.woff2') format('woff2-variations'),
+        url('/fonts/Inter.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-weight: 100 900;
+    font-style: oblique 0deg 10deg;
+}
+
+// Spline Sans Mono (monospaced font)
+@font-face {
+    font-family: 'Spline Sans Mono';
+    src: url('/fonts/SplineSansMono[wght].woff2') format('woff2-variations'),
+        url('/fonts/SplineSansMono[wght].woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Spline Sans Mono';
+    src: url('/fonts/SplineSansMono-Italic[wght].woff2') format('woff2-variations'),
+        url('/fonts/SplineSansMono-Italic[wght].woff2') format('woff2');
+
+    font-weight: normal;
+    font-style: italic;
+}

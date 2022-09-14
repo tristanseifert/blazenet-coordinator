@@ -1,12 +1,17 @@
 @charset "utf-8";
 
-// fonts
+@import "fonts";
 
 // do not use the bulma theme's font, in lieu of our custom fonts
 $bulmaswatch-import-font: false;
 
 // bulma (CSS framework) styles
 @import "~bulmaswatch/flatly/variables";
+
+// define bulma style overrides
+$family-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+$family-monospace: "Spline Sans Mono", "Inconsolata", "Consolas", "Monaco", monospace;
+
 @import "~bulma/bulma.sass";
 @import "~bulmaswatch/flatly/overrides";
-

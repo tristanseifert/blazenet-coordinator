@@ -1,1 +1,4 @@
 mix-manifest.json
+
+# font files are copied automagically by the build process
+fonts/
