@@ -13,7 +13,6 @@ const mix = require('laravel-mix');
 
 mix.js('resources/js/app.js', 'public/js').extract()
    .sass('resources/css/app.scss', 'public/css')
-    .copy('resources/fonts/**/*.woff', 'public/fonts')
     .copy('resources/fonts/**/*.woff2', 'public/fonts')
 
 .webpackConfig({

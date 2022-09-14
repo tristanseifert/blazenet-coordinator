@@ -15,3 +15,7 @@ $family-monospace: "Spline Sans Mono", "Inconsolata", "Consolas", "Monaco", mono
 
 @import "~bulma/bulma.sass";
 @import "~bulmaswatch/flatly/overrides";
+
+// components
+@import "footer";
+@import "navbar";

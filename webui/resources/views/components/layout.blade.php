@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="has-navbar-fixed-top">
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -10,8 +10,8 @@
 @stack('stylesheets')
     </head>
     <body {{ $attributes->merge(['class' => 'app']) }}>
-        <div id="page-wrapper">
             <x-navbar />
+        <div id="page-wrapper">
 
             <div class="container flash-container">
                 <x-session-messages />

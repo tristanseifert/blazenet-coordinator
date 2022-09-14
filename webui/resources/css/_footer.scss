@@ -1,0 +1,24 @@
+/**
+ * Styles for the footer. Among others, it will be sticky.
+ */
+body {
+    display: flex;
+    min-height: calc(100vh - #{$navbar-height});
+    flex-direction: column;
+}
+
+#page-wrapper {
+    flex: 1;
+}
+
+footer.footer {
+    .content {
+        // user info page
+        &.user-info {
+            @extend .has-text-grey;
+            span.ip {
+                font-family: $family-monospace;
+            }
+        }
+    }
+}

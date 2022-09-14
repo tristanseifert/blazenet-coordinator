@@ -11,7 +11,6 @@
     font-family: 'Archivo';
     src: url('/fonts/Archivo-Italic[wdth,wght].woff2') format('woff2-variations'),
         url('/fonts/Archivo-Italic.woff2') format('woff2');
-
     font-weight: normal;
     font-style: italic;
 }
@@ -45,7 +44,12 @@
     font-family: 'Spline Sans Mono';
     src: url('/fonts/SplineSansMono-Italic[wght].woff2') format('woff2-variations'),
         url('/fonts/SplineSansMono-Italic[wght].woff2') format('woff2');
-
     font-weight: normal;
     font-style: italic;
 }
+
+// Font Awesome
+$fa-font-path: "~@fortawesome/fontawesome-free/webfonts";
+@import "~@fortawesome/fontawesome-free/scss/fontawesome";
+@import "~@fortawesome/fontawesome-free/scss/regular";
+@import "~@fortawesome/fontawesome-free/scss/solid";
