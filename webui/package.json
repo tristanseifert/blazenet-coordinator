@@ -10,6 +10,9 @@
         "production": "mix --production"
     },
     "devDependencies": {
+        "@fontsource/archivo": "^4.5.8",
+        "@fontsource/inter": "^4.5.12",
+        "@fontsource/spline-sans-mono": "^4.5.1",
         "@fortawesome/fontawesome-free": "^6.2.0",
         "axios": "^0.27",
         "bulma": "^0.9.4",
