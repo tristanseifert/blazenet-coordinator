@@ -28,6 +28,20 @@ h1, h2, h3 {
     display: none;
 }
 
+// flash messages
+div.flash-container {
+    div.notification {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+}
+
+body {
+    section:first-of-type {
+        padding-top: $block-spacing;
+    }
+}
+
 // components
 @import "footer";
 @import "navbar";

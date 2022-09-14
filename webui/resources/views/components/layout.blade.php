@@ -29,9 +29,9 @@
         <x-layout-footer />
 
         {{-- this hidden form is used for logging out --}}
-        {{--<form id="global-logout-form" name="logoutform" action="{{ route('logout') }}" method="POST">
+        <form id="global-logout-form" name="logoutform" action="{{ route('logout') }}" method="POST">
             @csrf
-        </form>--}}
+        </form>
 
         <script src="{{ mix('/js/manifest.js') }}"></script>
         <script src="{{ mix('/js/vendor.js') }}"></script>

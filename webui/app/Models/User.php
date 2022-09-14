@@ -8,6 +8,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @brief Authentication user model
+ *
+ * @TODO Implement a guard that ensures the password isn't expired.
+ */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
@@ -18,9 +23,13 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
+        'username',
         'email',
+        'display_name',
         'password',
+        'is_enabled',
+        'password_expiration',
+        'password_changed_on',
     ];
 
     /**
@@ -40,5 +49,8 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login' => 'datetime',
+        'password_expiration' => 'datetime',
+        'password_changed_on' => 'datetime',
     ];
 }
