@@ -11,7 +11,7 @@ const mix = require('laravel-mix');
  |
  */
 
-mix.js('resources/js/app.js', 'public/js').extract()
+mix.js('resources/js/app.ts', 'public/js').extract()
    .sass('resources/css/app.scss', 'public/css')
     .copy('resources/fonts/**/*.woff2', 'public/fonts')
 
