@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="has-navbar-fixed-top">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $showNavbar ? "has-navbar-fixed-top" : "" }}">
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -10,13 +10,18 @@
 @stack('stylesheets')
     </head>
     <body {{ $attributes->merge(['class' => 'app']) }}>
+        @if($showNavbar)
             <x-navbar />
+        @endif
         <div id="page-wrapper">
+            {{-- session (flash) messages and navigation breadcrumbs --}}
+            @if($showFlashes)
+                <div class="container flash-container">
+                    <x-session-messages />
+                </div>
+            @endif
 
-            <div class="container flash-container">
-                <x-session-messages />
-            </div>
-
+            {{-- page content --}}
             {{ $slot }}
         </div>
 

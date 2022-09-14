@@ -38,10 +38,8 @@ mix.js('resources/js/app.ts', 'public/js').extract()
     },
 });
 
-// version the CSS/JS in prod
-if(mix.inProduction()) {
-    mix.minify().version();
-}
+// version the files (cache busting)
+mix.version();
 
 // get rid of the horrendously annoying notifications
 mix.disableNotifications();

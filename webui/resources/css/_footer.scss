@@ -3,8 +3,19 @@
  */
 body {
     display: flex;
-    min-height: calc(100vh - #{$navbar-height});
     flex-direction: column;
+}
+
+html:not(.has-navbar-fixed-top) {
+    body {
+        min-height: 100vh;
+    }
+}
+
+html.has-navbar-fixed-top {
+    body {
+        min-height: calc(100vh - #{$navbar-height});
+    }
 }
 
 #page-wrapper {
