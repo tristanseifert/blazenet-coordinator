@@ -1,0 +1,12 @@
+@charset "utf-8";
+
+// fonts
+
+// do not use the bulma theme's font, in lieu of our custom fonts
+$bulmaswatch-import-font: false;
+
+// bulma (CSS framework) styles
+@import "~bulmaswatch/flatly/variables";
+@import "~bulma/bulma.sass";
+@import "~bulmaswatch/flatly/overrides";
+
