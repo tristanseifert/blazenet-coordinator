@@ -1,7 +1,7 @@
 {{-- Top nav bar --}}
 <nav class="navbar is-fixed-top main-navbar" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">
-        <a class="navbar-item" href="/">BlazeNet Coordinator</a>
+        <a class="navbar-item" href="{{ route('homepage') }}">{{ config('app.name') }}</a>
 
         <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
         <span aria-hidden="true"></span>
@@ -12,7 +12,7 @@
 
     <div class="navbar-menu">
         <div class="navbar-start">
-            <a class="navbar-item">Home</a>
+            <a class="navbar-item" href="{{ route('homepage') }}">{{ __('navbar.link.home') }}</a>
         </div>
 
         {{-- actions on the right side (user menu) --}}
