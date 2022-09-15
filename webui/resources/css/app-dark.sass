@@ -1,0 +1,20 @@
+/**
+ * Secondary (dark mode) app styles
+ *
+ * Defines Bulma (and app styles that reference colors) specifically for dark mode.
+ */
+@charset "utf-8"
+
+// color scheme
+=prefers-scheme($scheme)
+  @media (prefers-color-scheme: $scheme)
+    @content
+
+// do not use the bulma theme's font, in lieu of our custom fonts
+$bulmaswatch-import-font: false
+
+// dark mode styles
++prefers-scheme(dark)
+    @import "~bulmaswatch/darkly/variables"
+    @import "bulma"
+    @import "~bulmaswatch/darkly/overrides"

@@ -1,0 +1,21 @@
+/**
+ * Primary (light mode) app styles
+ *
+ * This file contains the basic styles to use if the "dark" theme is not enabled. This also
+ * consists of spacings and other such things that are the same regardless of the mode.
+ */
+@charset "utf-8"
+
+// include app fonts
+@import "fonts"
+
+// do not use the bulma theme's font, in lieu of our custom fonts
+$bulmaswatch-import-font: false
+
+// light mode styles
+@import "~bulmaswatch/flatly/variables"
+@import "bulma"
+@import "~bulmaswatch/flatly/overrides"
+
+// app styles (general)
+@import "app"

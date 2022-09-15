@@ -12,7 +12,8 @@ const mix = require('laravel-mix');
  */
 
 mix.js('resources/js/app.ts', 'public/js').extract()
-   .sass('resources/css/app.scss', 'public/css')
+   .sass('resources/css/app-light.sass', 'public/css')
+   .sass('resources/css/app-dark.sass', 'public/css')
     .copy('resources/fonts/**/*.woff2', 'public/fonts')
 
 .webpackConfig({

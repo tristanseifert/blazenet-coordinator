@@ -6,7 +6,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{{ $title ?? env('APP_NAME') }}</title>
 
-        <link rel="stylesheet" href="{{ mix('/css/app.css') }}" />
+        <link rel="stylesheet" href="{{ mix('/css/app-light.css') }}" />
+        <link rel="stylesheet" href="{{ mix('/css/app-dark.css') }}" />
 @stack('stylesheets')
     </head>
     <body {{ $attributes->merge(['class' => 'app']) }}>
@@ -29,7 +30,7 @@
         <x-layout-footer />
 
         {{-- this hidden form is used for logging out --}}
-        <form id="global-logout-form" name="logoutform" action="{{ route('logout') }}" method="POST">
+        <form id="global-logout-form" class="is-hidden" name="logoutform" action="{{ route('logout') }}" method="POST">
             @csrf
         </form>
 
