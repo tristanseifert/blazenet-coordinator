@@ -39,7 +39,7 @@ extern void log_panic(const char *fmt, ...);
  * Defines the rate of timer interrupts per second, and in turn, the granularity of the software
  * timer facilities.
  */
-#define configTICK_RATE_HZ                                      ((TickType_t) 1000)
+#define configTICK_RATE_HZ                                      ((TickType_t) 100)
 
 #define configMAX_PRIORITIES                                    6
 #define configMINIMAL_STACK_SIZE                                ((unsigned short) 130)

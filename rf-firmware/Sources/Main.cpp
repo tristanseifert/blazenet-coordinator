@@ -4,15 +4,36 @@
  * @brief Application entry point
  */
 
-#include "em_gpio.h"
-
-#include "gecko-config/pin_config.h"
-
 #include "BuildInfo.h"
 #include "Hw/Clocks.h"
+#include "Hw/Indicators.h"
 #include "Log/Logger.h"
 #include "Rtos/Rtos.h"
 #include "Rtos/Start.h"
+
+#include <timers.h>
+
+/**
+ * @brief Perform early initialization
+ *
+ * This sets up basic low level system peripherals and subsystems in the firmware.
+ */
+static void EarlyInit() {
+    // configure system clocks
+    Hw::Clocks::Init();
+
+    // set up logging
+    Logger::Init();
+}
+
+/**
+ * @brief Initialize hardware
+ *
+ * Set up high level peripherals and external hardware.
+ */
+static void HwInit() {
+    Hw::Indicators::Init();
+}
 
 /**
  * @brief Firmware main routine
@@ -20,22 +41,20 @@
  * Invoked by startup code after the C runtime is set up.
  */
 extern "C" int main(int argc, void **argv) {
-    // enable peripheral clocks
-    Hw::Clocks::Init();
-
-    // subsystem initialization
-    Logger::Init();
+    EarlyInit();
     Logger::Notice("blazenet-rf firmware (%s-%s/%s) built on %s", gBuildInfo.gitBranch,
             gBuildInfo.gitHash, gBuildInfo.buildType, gBuildInfo.buildDate);
 
-    // set up LEDs
-    GPIO_PinModeSet(LED_nRX_PORT, LED_nRX_PIN, gpioModePushPull, true);
-    GPIO_PinModeSet(LED_nTX_PORT, LED_nTX_PIN, gpioModePushPull, true);
-    GPIO_PinModeSet(LED_nATTN_PORT, LED_nATTN_PIN, gpioModePushPull, false);
+    HwInit();
 
+    // create test thymer
+    static TimerHandle_t fuckHandle;
+    static StaticTimer_t fuckStorage;
 
-    unsigned int cum{0};
-    while(1) {
+    fuckHandle = xTimerCreateStatic("cum", pdMS_TO_TICKS(200), pdTRUE, nullptr,
+            [](auto timerId) {
+        static unsigned int cum{0};
+/*
         if(cum & (1 << 0)) {
             GPIO_PinOutSet(LED_nRX_PORT, LED_nRX_PIN);
         } else {
