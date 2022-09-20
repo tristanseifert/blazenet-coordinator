@@ -8,6 +8,7 @@
 #include "Hw/Clocks.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
+#include "Radio/Init.h"
 #include "Rtos/Rtos.h"
 #include "Rtos/Start.h"
 
@@ -33,6 +34,8 @@ static void EarlyInit() {
  */
 static void HwInit() {
     Hw::Indicators::Init();
+
+    Radio::Init();
 }
 
 /**

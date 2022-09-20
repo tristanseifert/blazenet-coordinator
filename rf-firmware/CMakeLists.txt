@@ -16,6 +16,7 @@ include(FetchContent)
 # Library configuration
 # external embedded base lib
 set(EFWB_TARGET "efr32xg23")
+set(EFWB_GECKO_DEVICE "EFR32FG23B020F512IM48")
 # XXX: figure out how to support floating point only mode
 set(EFWB_CBOR_HAS_FLOAT NO)
 
@@ -86,13 +87,18 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/Main.cpp
     Sources/Hw/Indicators.cpp
     Sources/Log/Logger.cpp
+    Sources/Radio/Init.cpp
+    Sources/Radio/Task.cpp
+    Sources/Radio/sl_rail_util_callbacks.c
+    Sources/Radio/sl_rail_util_init.c
+    Sources/Radio/rail_config.c
     Sources/Rtos/Idle.cpp
     Sources/Rtos/Memory.cpp
     Sources/Rtos/Start.cpp
 )
 
 target_include_directories(firmware PUBLIC Includes)
-target_include_directories(firmware PRIVATE Sources)
+target_include_directories(firmware PRIVATE Sources ${EFWB_GECKO_CONFIG_DIR})
 
 ####################################################################################################
 # Configure and include various external components
@@ -100,3 +106,7 @@ target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor)
 
 # FreeRTOS
 target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)
+
+# radio libraries
+target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail)
+
