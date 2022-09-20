@@ -38,7 +38,7 @@ ENTRY(Reset_Handler)
 
 MEMORY
 {
-    FLASH   (rx)  : ORIGIN = 0x8000000, LENGTH = 0x7e000
+    FLASH   (rx)  : ORIGIN = 0x08000000, LENGTH = 0x80000
     RAM     (rwx) : ORIGIN = 0x20000000, LENGTH = 0x10000
 }
 
@@ -53,190 +53,129 @@ STACK_SIZE = 0x800;
 SECTIONS
 {
 
-  .text :
-  {
-    linker_vectors_begin = .;
-    KEEP(*(.isr_vector))
-    KEEP(*(.vectors .vectors.*))
-    linker_vectors_end = .;
+    .text ALIGN(16) :
+    {
+        KEEP(*(.isr_vector))
+        KEEP(*(.vectors .vectors.*))
 
-    __Vectors_End = .;
-    __Vectors_Size = __Vectors_End - __Vectors;
+        linker_code_begin = .;
+        KEEP(*(.startup .startup.*))
 
-    linker_code_begin = .;
-    KEEP(*(.startup .startup.*))
-    *(.text*)
-    linker_code_end = .;
+        *(.text .text.* .gnu.linkonce.t.*)
+        *(.glue_7t) *(.glue_7)
+        linker_code_end = .;
 
-    KEEP(*(.init))
-    KEEP(*(.fini))
+        KEEP(*(.init))
+        KEEP(*(.fini))
 
-    /* .ctors */
-    *crtbegin.o(.ctors)
-    *crtbegin?.o(.ctors)
-    *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
-    *(SORT(.ctors.*))
-    *(.ctors)
+        /* .ctors */
+        *crtbegin.o(.ctors)
+        *crtbegin?.o(.ctors)
+        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+        *(SORT(.ctors.*))
+        *(.ctors)
 
-    /* .dtors */
-    *crtbegin.o(.dtors)
-    *crtbegin?.o(.dtors)
-    *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
-    *(SORT(.dtors.*))
-    *(.dtors)
+        /* .dtors */
+        *crtbegin.o(.dtors)
+        *crtbegin?.o(.dtors)
+        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+        *(SORT(.dtors.*))
+        *(.dtors)
 
-    *(.rodata*)
-    *(.eh_frame*)
-  } > FLASH
+        *(.rodata*)
+        *(.eh_frame*)
+    } > FLASH
 
-  .ARM.extab :
-  {
-    *(.ARM.extab* .gnu.linkonce.armextab.*)
-  } > FLASH
+    /* read-only data */
+    .rodata ALIGN(16) :
+    {
+        *(.rodata .rodata* .gnu.linkonce.r.*)
 
-  __exidx_start = .;
-  .ARM.exidx :
-  {
-    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-  } > FLASH
-  __exidx_end = .;
+        . = ALIGN(4);
+        *(.ARM.extab* .gnu.linkonce.armextab.*)
+        *(.ARM.exidx* .gnu.linkonce.armexidx.*)
 
-    .copy.table :
-  {
-    . = ALIGN(4);
-    __copy_table_start__ = .;
+        /* Support C constructors, and C destructors in both user code
+           and the C library. This also provides support for C++ code. */
+        . = ALIGN(4);
+        KEEP(*(.init))
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__preinit_array_start = .);
+        KEEP (*(.preinit_array))
+        PROVIDE_HIDDEN(__preinit_array_end = .);
 
-    LONG (__etext)
-    LONG (__data_start__)
-    LONG ((__data_end__ - __data_start__) / 4)
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__init_array_start = .);
+        KEEP (*(SORT(.init_array.*)))
+        KEEP (*(.init_array))
+        PROVIDE_HIDDEN(__init_array_end = .);
 
-    /* Add each additional data section here */
-/*
-    LONG (__etext2)
-    LONG (__data2_start__)
-    LONG ((__data2_end__ - __data2_start__) / 4)
-*/
-    __copy_table_end__ = .;
-  } > FLASH
+        . = ALIGN(4);
+        KEEP(*(.fini))
 
-    .zero.table :
-  {
-    . = ALIGN(4);
-    __zero_table_start__ = .;
-    /* Add each additional bss section here */
-/*
-    LONG (__bss2_start__)
-    LONG ((__bss2_end__ - __bss2_start__) / 4)
-*/
-    __zero_table_end__ = .;
-  } > FLASH
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__fini_array_start = .);
+        KEEP (*(.fini_array))
+        KEEP (*(SORT(.fini_array.*)))
+        PROVIDE_HIDDEN(__fini_array_end = .);
+    } >FLASH
 
-  __etext = .;
+    __etext = .;
 
-  /* Start placing output sections which are loaded into RAM */
-  . = ORIGIN(RAM);
+    /* Start placing output sections which are loaded into RAM */
+    . = ORIGIN(RAM);
 
-  .stack ALIGN(8) (NOLOAD):
-  {
-    __StackLimit = .;
-    _sstack = .;
-    . = . + STACK_SIZE;
-    . = ALIGN(16);
-    _estack = .;
-    __StackTop = .;
-    PROVIDE(__stack = __StackTop);
-  } > RAM
+    _sidata = LOADADDR(.data);
+    .data :
+    {
+        _sdata = .;
+        *(vtable)
+        *(.data .data*);
+        . = ALIGN(4);
+        _edata = .;
 
+        /* RAM functions (?) */
+        PROVIDE(__ram_func_section_start = .);
+        *(.ram)
+        PROVIDE(__ram_func_section_end = .);
 
-  .noinit . (NOLOAD):
-  {
-    *(.noinit*);
-  } > RAM
+        /* All data end */
+        __data_end__ = .;
+    } >RAM AT> FLASH
+    _datalen = _edata - _sdata;
 
-  .data . : AT (__etext)
-  {
-    . = ALIGN(4);
-    __data_start__ = .;
-    *(vtable)
-    *(.data*)
-    . = ALIGN (4);
+    /* zeroed sections */
+    .bss ALIGN(16) (NOLOAD):
+    {
+        _sbss = .;
+        _szero = .;
+        *(.bss .bss.*)
+        *(COMMON)
+        . = ALIGN(4);
+        _ebss = .;
+        _ezero = .;
+    } >RAM
+    _bsslen = _ebss - _sbss;
 
-    PROVIDE(__ram_func_section_start = .);
-    *(.ram)
-    PROVIDE(__ram_func_section_end = .);
+    /* boot and interrupt stack */
+    .stack ALIGN(16) (NOLOAD):
+    {
+        _sstack = .;
+        . = . + STACK_SIZE;
+        . = ALIGN(16);
+        _estack = .;
+    } > RAM
 
-    . = ALIGN(4);
-    /* preinit data */
-    PROVIDE_HIDDEN (__preinit_array_start = .);
-    KEEP(*(.preinit_array))
-    PROVIDE_HIDDEN (__preinit_array_end = .);
+    /* remainder of RAM is available as a heap */
+    .heap ALIGN(16) (NOLOAD):
+    {
+        PROVIDE_HIDDEN(_sheap = .);
+        __end__ = .;
+        end = __end__;
+        _end = __end__;
+        . = ORIGIN(RAM) + LENGTH(RAM);
+        PROVIDE_HIDDEN(_eheap = .);
+    } >RAM
 
-    . = ALIGN(4);
-    /* init data */
-    PROVIDE_HIDDEN (__init_array_start = .);
-    KEEP(*(SORT(.init_array.*)))
-    KEEP(*(.init_array))
-    PROVIDE_HIDDEN (__init_array_end = .);
-
-    . = ALIGN(4);
-    /* finit data */
-    PROVIDE_HIDDEN (__fini_array_start = .);
-    KEEP(*(SORT(.fini_array.*)))
-    KEEP(*(.fini_array))
-    PROVIDE_HIDDEN (__fini_array_end = .);
-
-    . = ALIGN(4);
-    /* All data end */
-    __data_end__ = .;
-
-  } > RAM
-
-  .bss . :
-  {
-    . = ALIGN(4);
-    __bss_start__ = .;
-    *(.bss*)
-    *(COMMON)
-    . = ALIGN(4);
-    __bss_end__ = .;
-  } > RAM
-
-  .heap (COPY):
-  {
-    PROVIDE_HIDDEN(_sheap = .);
-    __end__ = .;
-    end = __end__;
-    _end = __end__;
-    KEEP(*(.heap*))
-    . = ORIGIN(RAM) + LENGTH(RAM);
-    PROVIDE_HIDDEN(_eheap = .);
-    __HeapLimit = .;
-  } > RAM
-
-  __heap_size = __HeapLimit - __HeapBase;
-  __main_flash_end__ = 0x8000000 + 0x7e000;
-
-   /* This is where we handle flash storage blocks. We use dummy sections for finding the configured
-   * block sizes and then "place" them at the end of flash when the size is known. */
-  .internal_storage (DSECT) : {
-    KEEP(*(.internal_storage*))
-  } > FLASH
-  
-
-  .nvm (DSECT) : {
-    KEEP(*(.simee*))
-  } > FLASH
-
-  linker_nvm_end = __main_flash_end__;
-  linker_nvm_begin = linker_nvm_end - SIZEOF(.nvm);
-  linker_nvm_size = SIZEOF(.nvm);
-  linker_storage_end = linker_nvm_begin;
-  __nvm3Base = linker_nvm_begin;
-
-  linker_storage_begin = linker_storage_end - SIZEOF(.internal_storage);
-  linker_storage_size = SIZEOF(.internal_storage);
-  ASSERT((linker_storage_begin >= (__etext + SIZEOF(.data))), "FLASH memory overflowed !")
-
-  app_flash_end = 0x8000000 + 0x7e000;
-  ASSERT( (linker_nvm_begin + SIZEOF(.nvm)) <= app_flash_end, "NVM3 is excessing the flash size !")
+    /* this is where we might add sections for NVM3 driver */
 }

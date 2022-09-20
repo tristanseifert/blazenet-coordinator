@@ -19,7 +19,11 @@ set(EFWB_TARGET "efr32xg23")
 # XXX: figure out how to support floating point only mode
 set(EFWB_CBOR_HAS_FLOAT NO)
 
+set(FREERTOS_HEAP "${CMAKE_CURRENT_LIST_DIR}/Sources/Rtos/DummyAllocator.c" CACHE STRING "")
 set(FREERTOS_CONFIG_FILE_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/Includes/FreeRTOS/" CACHE STRING "")
+
+# config path for the Gecko SDK files
+set(EFWB_GECKO_CONFIG_DIR "${CMAKE_CURRENT_LIST_DIR}/Includes/gecko-config/" CACHE STRING "")
 
 ###############
 # Get version information from Git and some additional build info
@@ -76,6 +80,13 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     LDMAP ${CMAKE_CURRENT_BINARY_DIR}/output.map
     SOURCES
     ${BuildInfoFile}
+    Sources/Init/CppHeap.cpp
+    Sources/Init/StackGuard.cpp
+    Sources/Main.cpp
+    Sources/Log/Logger.cpp
+    Sources/Rtos/Idle.cpp
+    Sources/Rtos/Memory.cpp
+    Sources/Rtos/Start.cpp
 )
 
 target_include_directories(firmware PUBLIC Includes)

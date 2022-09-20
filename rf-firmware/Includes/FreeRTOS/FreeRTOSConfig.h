@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-//#include "stm32mp1xx.h"
+#include "em_device.h"
 
 extern void log_panic(const char *fmt, ...);
 
@@ -90,7 +90,7 @@ extern void log_panic(const char *fmt, ...);
 /// Enable static allocation support
 #define configSUPPORT_STATIC_ALLOCATION                         1
 /// Disable dynamic allocation support
-#define configSUPPORT_DYNAMIC_ALLOCATION                        1
+#define configSUPPORT_DYNAMIC_ALLOCATION                        0
 
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function. */
