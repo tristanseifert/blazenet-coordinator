@@ -81,6 +81,7 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     SOURCES
     ${BuildInfoFile}
     Sources/Init/CppHeap.cpp
+    Sources/Init/FaultHandlers.cpp
     Sources/Init/StackGuard.cpp
     Sources/Main.cpp
     Sources/Log/Logger.cpp

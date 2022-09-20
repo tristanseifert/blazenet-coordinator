@@ -15,7 +15,7 @@ extern void log_panic(const char *fmt, ...);
 
 /// enable preemptive multithreading
 #define configUSE_PREEMPTION                                    1
-#define configUSE_PORT_OPTIMISED_TASK_SELECTION                 1
+#define configUSE_PORT_OPTIMISED_TASK_SELECTION                 0
 
 /**
  * @brief Idle hook
@@ -39,14 +39,15 @@ extern void log_panic(const char *fmt, ...);
  * Defines the rate of timer interrupts per second, and in turn, the granularity of the software
  * timer facilities.
  */
-#define configTICK_RATE_HZ                                      ((TickType_t) 1000)\
+#define configTICK_RATE_HZ                                      ((TickType_t) 1000)
 
-#define configMAX_PRIORITIES                                    (8)
+#define configMAX_PRIORITIES                                    6
 #define configMINIMAL_STACK_SIZE                                ((unsigned short) 130)
 
 #define configMAX_TASK_NAME_LEN                                 (16)
 #define configUSE_TRACE_FACILITY                                1
 #define configUSE_16_BIT_TICKS                                  0
+#define configUSE_TIME_SLICING                                  1
 #define configIDLE_SHOULD_YIELD                                 1
 #define configUSE_MUTEXES                                       1
 #define configQUEUE_REGISTRY_SIZE                               0
@@ -111,29 +112,29 @@ to exclude the API function. */
 // mutex functions to include
 #define INCLUDE_xSemaphoreGetMutexHolder                        1
 
-/* Cortex-M specific definitions. */
+/* Use the system definition, if there is one. */
 #ifdef __NVIC_PRIO_BITS
-/* __BVIC_PRIO_BITS will be specified when CMSIS is being used. */
-#define configPRIO_BITS                                 __NVIC_PRIO_BITS
+    #define configPRIO_BITS                                     __NVIC_PRIO_BITS
 #else
-#error Define __NVIC_PRIO_BITS
+    #error Define __NVIC_PRIO_BITS
 #endif
 
 /* The lowest interrupt priority that can be used in a call to a "set priority"
-function. */
-#define configLIBRARY_LOWEST_INTERRUPT_PRIORITY                 0x0f
+ * function. */
+#define configLIBRARY_LOWEST_INTERRUPT_PRIORITY                 0x07
 
 /* The highest interrupt priority that can be used by any interrupt service
-routine that makes calls to interrupt safe FreeRTOS API functions.  DO NOT CALL
-INTERRUPT SAFE FREERTOS API FUNCTIONS FROM ANY INTERRUPT THAT HAS A HIGHER
-PRIORITY THAN THIS! (higher priorities are lower numeric values. */
+ * routine that makes calls to interrupt safe FreeRTOS API functions.  DO NOT
+ * CALL INTERRUPT SAFE FREERTOS API FUNCTIONS FROM ANY INTERRUPT THAT HAS A
+ * HIGHER PRIORITY THAN THIS! (higher priorities are lower numeric values). */
 #define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY            5
 
 /* Interrupt priorities used by the kernel port layer itself.  These are generic
-to all Cortex-M ports, and do not rely on any particular library functions. */
+ * to all Cortex-M ports, and do not rely on any particular library functions. */
 #define configKERNEL_INTERRUPT_PRIORITY                         (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
+
 /* !!!! configMAX_SYSCALL_INTERRUPT_PRIORITY must not be set to zero !!!!
-See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
+ * See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY                    (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
 /**
@@ -156,5 +157,11 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define xPortPendSVHandler PendSV_Handler
 /// SysTick IRQ
 #define xPortSysTickHandler SysTick_Handler
+
+// Cortex-M33 port settings
+#define configENABLE_MPU                                        0
+#define configENABLE_FPU                                        1
+#define configENABLE_TRUSTZONE                                  0
+#define configRUN_FREERTOS_SECURE_ONLY                          1
 
 #endif

@@ -11,6 +11,7 @@
 
 #include "BuildInfo.h"
 #include "Log/Logger.h"
+#include "Rtos/Rtos.h"
 #include "Rtos/Start.h"
 
 /**
@@ -29,8 +30,9 @@ extern "C" int main(int argc, void **argv) {
 
     // set up LEDs
     GPIO_PinModeSet(LED_nRX_PORT, LED_nRX_PIN, gpioModePushPull, true);
-    GPIO_PinModeSet(LED_nTX_PORT, LED_nTX_PIN, gpioModePushPull, false);
-    GPIO_PinModeSet(LED_nATTN_PORT, LED_nATTN_PIN, gpioModePushPull, true);
+    GPIO_PinModeSet(LED_nTX_PORT, LED_nTX_PIN, gpioModePushPull, true);
+    GPIO_PinModeSet(LED_nATTN_PORT, LED_nATTN_PIN, gpioModePushPull, false);
+
 
     unsigned int cum{0};
     while(1) {
@@ -58,4 +60,6 @@ extern "C" int main(int argc, void **argv) {
         volatile unsigned int fuck{1420690};
         while(fuck--) {}
     }
+    // start scheduler
+    Rtos::StartScheduler();
 }
