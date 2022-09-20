@@ -4,12 +4,12 @@
  * @brief Application entry point
  */
 
-#include "em_cmu.h"
 #include "em_gpio.h"
 
 #include "gecko-config/pin_config.h"
 
 #include "BuildInfo.h"
+#include "Hw/Clocks.h"
 #include "Log/Logger.h"
 #include "Rtos/Rtos.h"
 #include "Rtos/Start.h"
@@ -21,7 +21,7 @@
  */
 extern "C" int main(int argc, void **argv) {
     // enable peripheral clocks
-    CMU_ClockEnable(cmuClock_GPIO, true);
+    Hw::Clocks::Init();
 
     // subsystem initialization
     Logger::Init();
