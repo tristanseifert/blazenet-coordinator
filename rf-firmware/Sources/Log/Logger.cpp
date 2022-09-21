@@ -1,11 +1,12 @@
-#include "Logger.h"
-
-#include "Rtos/Rtos.h"
-
 #include "em_device.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
 #include "sl_debug_swo.h"
+
+#include "Logger.h"
+
+#include "Drivers/sl_uartdrv_instances.h"
+#include "Rtos/Rtos.h"
 
 #include <printf/printf.h>
 #include <stdarg.h>
@@ -29,6 +30,10 @@ bool Logger::gInitialized{false};
  */
 Logger::Level Logger::gLevel{Logger::Level::Trace};
 
+/**
+ * @brief UART transmit completion flag
+ */
+SemaphoreHandle_t Logger::gUartCompletion{nullptr};
 
 
 /**
@@ -43,6 +48,16 @@ void Logger::Init() {
 
         sl_debug_swo_init();
         sl_debug_swo_enable_itm(0);
+    }
+
+    // set up signalling for UART
+    if(kEnableUartTty) {
+        static StaticSemaphore_t gStorage;
+
+        gUartCompletion = xSemaphoreCreateBinaryStatic(&gStorage);
+        REQUIRE(!!gUartCompletion, "failed to initialize %s", "UART completion");
+
+        xSemaphoreGive(gUartCompletion);
     }
 }
 
@@ -66,6 +81,7 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
     int numChars{0};
     size_t bufferSz{0}, bytesWritten{0};
     char *buffer{nullptr}, *bufferStart{nullptr};
+    bool hasScheduler{true};
 
     // log buffer used before scheduler is started
     static char gLogBuffer[kTaskLogBufferSize];
@@ -79,6 +95,7 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
     if(xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
         buffer = gLogBuffer;
         bufferSz = kTaskLogBufferSize;
+        hasScheduler = false;
     }
     // scheduler is running, so query thread-local storage
     else {
@@ -106,6 +123,10 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
 
         // buffer is always this same size
         bufferSz = kTaskLogBufferSize;
+
+        // acquire UART output
+        // XXX: could be skipped if we're outputting a different buffer right now
+        xSemaphoreTake(gUartCompletion, portMAX_DELAY);
     }
 
     bufferStart = buffer;
@@ -132,10 +153,29 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
     bufferSz -= numChars;
     buffer += numChars;
 
+    *buffer++ = '\n';
+    bytesWritten++;
+
     // write it to our output devices
     //taskENTER_CRITICAL();
     if(kEnableTraceSwo) {
         TracePutString({bufferStart, bytesWritten});
+    }
+    if(kEnableUartTty) {
+        // TODO: transmit timestamp, severity as binary
+        if(hasScheduler) {
+            // use DMA driven transmission here
+            UARTDRV_Transmit(sl_uartdrv_eusart_tty_handle, reinterpret_cast<uint8_t *>(bufferStart),
+                    bytesWritten, [](auto handle, auto status, auto data, auto dataLen) {
+                BaseType_t woken{pdFALSE};
+                xSemaphoreGiveFromISR(gUartCompletion, &woken);
+                portYIELD_FROM_ISR(woken);
+            });
+        } else {
+            // scheduler isn't running, so write it out directly
+            UARTDRV_ForceTransmit(sl_uartdrv_eusart_tty_handle, reinterpret_cast<uint8_t *>(bufferStart),
+                    bytesWritten);
+        }
     }
     //taskEXIT_CRITICAL();
 }
@@ -164,7 +204,7 @@ void Logger::Panic() {
         } else {
             Error("========== RTOS state ==========");
             Error("Total runtime: %10lu", totalRuntime);
-            Error("%8s %-16s S %10s %2s %3s", "Handle", "Name", "Runtime", "PR", "STK");
+            Error("%8s %-16s S %10s %3s %3s", "Handle", "Name", "Runtime", "PRI", "STK");
 
             for(size_t i = 0; i < ok; i++) {
                 const auto &task = gTaskInfo[i];
@@ -190,7 +230,7 @@ void Logger::Panic() {
                         break;
                 }
 
-                Error("%08x %-16s %c %10lu %2u %03x", task.xHandle, task.pcTaskName, stateChar,
+                Error("%08x %-16s %c %10lu %3u %03x", task.xHandle, task.pcTaskName, stateChar,
                         task.ulRunTimeCounter, task.uxCurrentPriority, task.usStackHighWaterMark);
             }
         }

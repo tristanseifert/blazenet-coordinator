@@ -95,10 +95,15 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/Rtos/Idle.cpp
     Sources/Rtos/Memory.cpp
     Sources/Rtos/Start.cpp
+    Sources/Drivers/sl_uartdrv_init.c
 )
 
 target_include_directories(firmware PUBLIC Includes)
 target_include_directories(firmware PRIVATE Sources ${EFWB_GECKO_CONFIG_DIR})
+
+# shut up some warnings per-file
+set_source_files_properties(Sources/Drivers/sl_uartdrv_init.c PROPERTIES COMPILE_FLAGS
+    -Wno-cast-qual)
 
 ####################################################################################################
 # Configure and include various external components
@@ -107,6 +112,6 @@ target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor)
 # FreeRTOS
 target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)
 
-# radio libraries
-target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail)
-
+# hardware drivers
+target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail
+    embedded-fw-base::efr32xg23-emdrv-uartdrv)

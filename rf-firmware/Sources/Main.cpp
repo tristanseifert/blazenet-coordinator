@@ -3,6 +3,8 @@
  *
  * @brief Application entry point
  */
+#include "gpiointerrupt.h"
+#include "Drivers/sl_uartdrv_instances.h"
 
 #include "BuildInfo.h"
 #include "Hw/Clocks.h"
@@ -28,14 +30,16 @@ static void EarlyInit() {
 }
 
 /**
- * @brief Initialize hardware
+ * @brief Initialize hardware and drivers
  *
  * Set up high level peripherals and external hardware.
  */
 static void HwInit() {
     Hw::Indicators::Init();
 
-    Radio::Init();
+    // high level drivers
+    GPIOINT_Init();
+    sl_uartdrv_init_instances();
 }
 
 /**
@@ -45,10 +49,12 @@ static void HwInit() {
  */
 extern "C" int main(int argc, void **argv) {
     EarlyInit();
+    HwInit();
+
     Logger::Notice("blazenet-rf firmware (%s-%s/%s) built on %s", gBuildInfo.gitBranch,
             gBuildInfo.gitHash, gBuildInfo.buildType, gBuildInfo.buildDate);
 
-    HwInit();
+    Radio::Init();
 
     // create test thymer
     static TimerHandle_t fuckHandle;

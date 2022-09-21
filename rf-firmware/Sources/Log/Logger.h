@@ -8,6 +8,8 @@
 #include <etl/span.h>
 #include <etl/string_view.h>
 
+#include "Rtos/Rtos.h"
+
 extern "C" void log_panic(const char *, ...);
 
 /// Log message handling
@@ -19,7 +21,8 @@ namespace Log {
  * writing them to multiple output destinations. Logs may also be archived on some form of
  * persistent storage for later retrieval.
  *
- * Currently, messages are logged using the trace output on the debugger.
+ * Messages can be output either via the debugger's trace facilities (for when things are really
+ * fucked) or to the host via the DMA driven TTY UART, running at 4Mbaud.
  */
 class Logger {
     friend void ::log_panic(const char *, ...);
@@ -35,7 +38,7 @@ class Logger {
         /**
          * @brief Whether log messages are output via debug trace SWO
          */
-        constexpr static const bool kEnableTraceSwo{true};
+        constexpr static const bool kEnableTraceSwo{false};
 
         /**
          * @brief Whether log messages are output via UART
@@ -43,7 +46,7 @@ class Logger {
          * This serial port runs at 921600 baud, and is connected directly to the host. All
          * messages received are timestamped and stored in the system log.
          */
-        constexpr static const bool kEnableUartTty{false};
+        constexpr static const bool kEnableUartTty{true};
 
     private:
         static void TracePutString(etl::span<const char> str);
@@ -172,6 +175,8 @@ class Logger {
     private:
         static bool gInitialized;
         static Level gLevel;
+
+        static SemaphoreHandle_t gUartCompletion;
 };
 }
 
