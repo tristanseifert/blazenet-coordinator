@@ -8,6 +8,7 @@
 #include "Drivers/sl_uartdrv_instances.h"
 
 #include "BuildInfo.h"
+#include "Fs/Init.h"
 #include "Hw/Clocks.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
@@ -45,6 +46,24 @@ static void HwInit() {
 }
 
 /**
+ * @brief Initialize firmware components
+ *
+ * This will set up the high level firmware components, including the radio stack and host
+ * communication interfaces. The external flash filesystem is probed as well.
+ */
+static void SwInit() {
+    Logger::Notice("blazenet-rf firmware (%s-%s/%s) built on %s", gBuildInfo.gitBranch,
+            gBuildInfo.gitHash, gBuildInfo.buildType, gBuildInfo.buildDate);
+
+    Fs::Init();
+
+    // radio hardware and RAIL stack
+    Radio::Init();
+}
+
+
+
+/**
  * @brief Firmware main routine
  *
  * Invoked by startup code after the C runtime is set up.
@@ -52,11 +71,7 @@ static void HwInit() {
 extern "C" int main(int argc, void **argv) {
     EarlyInit();
     HwInit();
-
-    Logger::Notice("blazenet-rf firmware (%s-%s/%s) built on %s", gBuildInfo.gitBranch,
-            gBuildInfo.gitHash, gBuildInfo.buildType, gBuildInfo.buildDate);
-
-    Radio::Init();
+    SwInit();
 
     // create test thymer
     static TimerHandle_t fuckHandle;

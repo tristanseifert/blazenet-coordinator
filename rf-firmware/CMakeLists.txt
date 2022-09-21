@@ -95,6 +95,10 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/Rtos/Idle.cpp
     Sources/Rtos/Memory.cpp
     Sources/Rtos/Start.cpp
+    Sources/Fs/Init.cpp
+    Sources/Fs/Flash.cpp
+    Sources/Fs/FlashInfo.cpp
+    Sources/Drivers/sl_spidrv_init.c
     Sources/Drivers/sl_uartdrv_init.c
 )
 
@@ -114,4 +118,4 @@ target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)
 
 # hardware drivers
 target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail
-    embedded-fw-base::efr32xg23-emdrv-uartdrv)
+    embedded-fw-base::efr32xg23-emdrv-spidrv embedded-fw-base::efr32xg23-emdrv-uartdrv)
