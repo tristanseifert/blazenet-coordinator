@@ -4,6 +4,7 @@
  * @brief Application entry point
  */
 #include "gpiointerrupt.h"
+#include "Drivers/sl_spidrv_instances.h"
 #include "Drivers/sl_uartdrv_instances.h"
 
 #include "BuildInfo.h"
@@ -37,8 +38,9 @@ static void EarlyInit() {
 static void HwInit() {
     Hw::Indicators::Init();
 
-    // high level drivers
     GPIOINT_Init();
+
+    sl_spidrv_init_instances();
     sl_uartdrv_init_instances();
 }
 
