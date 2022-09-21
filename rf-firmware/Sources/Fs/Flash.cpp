@@ -293,6 +293,33 @@ int Flash::eraseChip() {
     return this->waitForCompletion(this->info->timeoutChipErase);
 }
 
+/**
+ * @brief Perform a software reset on the flash.
+ *
+ * Most flash chips have a certain time interval after reset that must be observed before certain
+ * types of accesses (program/erase operations) can be performed.
+ */
+int Flash::reset() {
+    int err;
+
+    // reset enable
+    if(this->info->cmdResetEnable) {
+        etl::array<uint8_t, 1> cmd{{
+            this->info->cmdResetEnable
+        }};
+        err = ExecCmd(cmd);
+        if(err) {
+            return err;
+        }
+    }
+
+    // do the reset
+    etl::array<uint8_t, 1> cmd{{
+        this->info->cmdReset
+    }};
+    return ExecCmd(cmd);
+}
+
 
 
 /**

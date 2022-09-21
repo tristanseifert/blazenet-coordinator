@@ -18,7 +18,7 @@ static inline uint32_t Crc32(etl::span<const uint8_t> message) {
     for(size_t i = 0; i < message.size(); i++) {
         byte = message[i];
         crc = crc ^ byte;
-        for(size_t j = 7; j>= 0; j--) {
+        for(int j = 7; j>= 0; j--) {
             mask = -(crc & 1);
             crc = (crc >> 1) ^ (0xEDB88320 & mask);
         }

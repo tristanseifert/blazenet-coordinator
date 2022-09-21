@@ -57,6 +57,15 @@ class Flash {
         int eraseBlock(const uintptr_t address);
         int eraseChip();
 
+        int reset();
+
+        /**
+         * @brief Get the flash information structure
+         */
+        constexpr inline auto getInfo() const {
+            return this->info;
+        }
+
         /**
          * @brief Execute the "JEDEC Identify" command
          *

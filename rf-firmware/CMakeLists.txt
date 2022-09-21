@@ -55,15 +55,12 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options(-Wall -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always
-    -ftls-model=initial-exec -Wundef -Wcast-qual -Wwrite-strings)
+    -ftls-model=initial-exec -Wundef -Wcast-qual -Wwrite-strings -Wno-error)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    add_compile_options(-Werror -Wimplicit-fallthrough -Wno-deprecated-copy -Wno-address-of-packed-member
+    add_compile_options(-Wimplicit-fallthrough -Wno-deprecated-copy -Wno-address-of-packed-member
         -Wno-expansion-to-defined -Wno-undef -Wno-unused-private-field -Wno-deprecated-volatile)
 endif()
-
-# don't allow upcasts to double
-add_compile_options(-Wdouble-promotion)
 
 FetchContent_Declare(
     fw-base

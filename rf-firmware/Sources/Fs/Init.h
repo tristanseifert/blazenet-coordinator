@@ -13,6 +13,11 @@ namespace Fs {
  * as its key material, MAC addresses, etc.) among other things.
  */
 struct Superblock {
+    /// Supported filesystem types
+    enum FsType: uint32_t {
+        SPIFFS                                  = 0x01,
+    };
+
     /// Header magic value
     constexpr static const uint32_t kMagic{0x424C415A};
     /// Current superblock version
@@ -42,11 +47,24 @@ struct Superblock {
     /**
      * @brief Filesystem type
      *
-     * Defines the type of filesystem that's stored in the SPI NOR. Currently defined values are:
+     * Defines the type of filesystem that's stored in the SPI NOR.
      *
-     * - 0x01: SPIFFS
+     * @seeAlso FsType
      */
     uint32_t fsType;
+
+    /**
+     * @brief Starting byte address of the filesystem
+     *
+     * @remark This should be aligned to one of the flash chip's erase block sizes, typically a
+     *         single sector.
+     */
+    uint32_t fsStart;
+
+    /**
+     * @brief Ending byte address of the filesystem
+     */
+    uint32_t fsEnd;
 
     /**
      * @brief CRC32 over superblock contents

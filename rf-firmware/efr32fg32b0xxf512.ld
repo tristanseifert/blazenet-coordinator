@@ -118,6 +118,7 @@ SECTIONS
         KEEP (*(.fini_array))
         KEEP (*(SORT(.fini_array.*)))
         PROVIDE_HIDDEN(__fini_array_end = .);
+        . = ALIGN(4);
     } >FLASH
 
     __etext = .;

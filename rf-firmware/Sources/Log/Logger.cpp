@@ -153,9 +153,6 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
     bufferSz -= numChars;
     buffer += numChars;
 
-    *buffer++ = '\n';
-    bytesWritten++;
-
     // write it to our output devices
     //taskENTER_CRITICAL();
     if(kEnableTraceSwo) {
@@ -175,6 +172,8 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
             // scheduler isn't running, so write it out directly
             UARTDRV_ForceTransmit(sl_uartdrv_eusart_tty_handle, reinterpret_cast<uint8_t *>(bufferStart),
                     bytesWritten);
+            UARTDRV_ForceTransmit(sl_uartdrv_eusart_tty_handle,
+                    reinterpret_cast<uint8_t *>(const_cast<char *>("\r\n")), 2);
         }
     }
     //taskEXIT_CRITICAL();

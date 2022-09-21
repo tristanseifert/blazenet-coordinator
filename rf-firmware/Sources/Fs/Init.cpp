@@ -18,14 +18,80 @@
 
 using namespace Fs;
 
-static void FormatNor(Flash *);
-
 /**
  * @brief Base address for superblock
  *
  * Flash address at which the superblock is stored
  */
 constexpr static const uintptr_t kSuperblockAddress{0x000000};
+
+/**
+ * @brief Initialize the contents of a superblock
+ *
+ * This is used during formatting to set up the filesystem. The superblock is initialized and all
+ * remaining space in the filesystem is reserved for the filesystem use.
+ */
+static void InitSuperblock(Flash *flash, Superblock *superblock) {
+    // start with the constants
+    superblock->magic = Superblock::kMagic;
+    superblock->version = Superblock::kVersion;
+    superblock->totalLength = sizeof(Superblock);
+
+    // partitioning for SPIFFS
+    superblock->fsType = Superblock::FsType::SPIFFS;
+
+    superblock->fsStart = flash->getInfo()->sectorSizeBytes();
+    superblock->fsEnd = flash->getInfo()->capacityBytes() - 1 - superblock->fsStart;
+
+    // calculate CRC
+    etl::span<const uint8_t, sizeof(Superblock)> superblockBytes{
+        reinterpret_cast<const uint8_t *>(superblock), sizeof(Superblock)};
+    const auto superblockCrcBytes = superblockBytes.subspan<0, offsetof(Superblock, crc)>();
+
+    superblock->crc = Util::Crc32(superblockCrcBytes);
+}
+
+/**
+ * @brief Format the attached SPI flash
+ *
+ * This will erase the entire chip, then write in the superblock and format the underlying
+ * filesystem as well. It will be empty.
+ */
+static void FormatNor(Flash *flash, Superblock *superblock) {
+    int err{0};
+
+    // erase the entire chip
+    Logger::Notice("Erasing NOR!");
+    //err = flash->eraseChip();
+    err = flash->eraseSector(kSuperblockAddress);
+    REQUIRE(!err, "%s failed: %d", "erase NOR", err);
+
+    // allocate superblock memory then populate it
+    InitSuperblock(flash, superblock);
+
+    // then write the superblock
+    Logger::Notice("Writing superblock!");
+    etl::span<const uint8_t, sizeof(Superblock)> superblockBytes{
+        reinterpret_cast<const uint8_t *>(superblock), sizeof(Superblock)};
+
+    err = flash->write(kSuperblockAddress, superblockBytes);
+    REQUIRE(!err, "%s failed: %d", "write superblock", err);
+
+    // TODO: initialize fs
+}
+
+/**
+ * @brief Wrapper around formatting to reset the system after
+ */
+[[noreturn]] static inline void Format(Flash *flash, Superblock *superblock) {
+    Logger::Warning("NOR is empty, formatting");
+    FormatNor(flash, superblock);
+
+    Logger::Notice("Format complete, resetting");
+    NVIC_SystemReset();
+}
+
+
 
 /**
  * @brief Initialize the external filesystem
@@ -65,11 +131,16 @@ void Fs::Init() {
      * the blocking interface as well for use when the scheduler is active.
      */
     auto flash = new Flash(info);
-    //flash->reset();
+    err = flash->reset();
+    REQUIRE(!err, "%s failed: %d", "reset flash", err);
 
     /*
      * Read out (and validate) the superblock from the flash. This will indicate where the actual
      * filesystem begins, and where we can read the identity data from.
+     *
+     * Also ensure that the flash isn't empty: we check this by comparing the entire superblock
+     * against 0xFF. If that's the case, we go immediately to format (and then reset) to handle the
+     * first boot case.
      */
     auto superblock = reinterpret_cast<Superblock *>(malloc(sizeof(Superblock)));
     REQUIRE(!!superblock, "failed to alloc %s", "flash superblock");
@@ -88,60 +159,49 @@ void Fs::Init() {
     }
 
     if(isEmpty) {
-        Logger::Warning("NOR is empty, formatting");
-        FormatNor(flash);
+        Format(flash, superblock);
     }
 
-/*
+    /*
+     * We've read _something_ that may be a superblock, e.g. the flash isn't empty.
+     *
+     * Perform some validation over the structure. First validate that the length value is
+     * sensible, then we'll check the magic value, CRC, version, and other such fun things before
+     * we go and do stuff with it.
+     *
+     * If any part of this validation fails, we'll panic, as this most likely means the flash has
+     * become corrupted.
+     */
     bool superblockValid{false};
     // calculate the CRC over the read bytes (assuming the struct version matches what we've got)
     etl::span<const uint8_t, sizeof(Superblock)> superblockBytes{
         reinterpret_cast<const uint8_t *>(superblock), sizeof(Superblock)};
     const auto superblockCrcBytes = superblockBytes.subspan<0, offsetof(Superblock, crc)>();
 
-    Logger::Notice("%p %u, %p %u", superblockBytes.data(), superblockBytes.size(),
-            superblockCrcBytes.data(), superblockCrcBytes.size());
-
     const auto computedCrc = Util::Crc32(superblockCrcBytes);
 
-    if(superblock->magic != Superblock::kMagic) {
+    // before accessing it, ensure the size is sensible
+    if(superblock->totalLength < sizeof(Superblock)) {
+        Logger::Warning("invalid superblock %s: %08x (expected %08x)", "size",
+                superblock->totalLength, sizeof(Superblock));
+    }
+    else if(superblock->magic != Superblock::kMagic) {
         Logger::Warning("invalid superblock %s: %08x (expected %08x)", "magic", superblock->magic,
                 Superblock::kMagic);
     } else if(superblock->crc != computedCrc) {
-        Logger::Warning("invalid superblock %s: %08x (expected %08x)", "magic", superblock->crc,
+        Logger::Warning("invalid superblock %s: %08x (expected %08x)", "CRC", superblock->crc,
                 computedCrc);
     } else {
         // otherwise, it passed all the tests
         superblockValid = true;
     }
 
-    // format the flash if superblock is invalid
-    if(!superblockValid) {
-        free(superblock);
+    REQUIRE(superblockValid, "flash superblock is invalid!");
 
-        Format();
-        return NVIC_SystemReset();
-    }
     // otherwise, initialize the filesystem
 
     Logger::Notice("Superblock (version %08x)", superblock->version);
     // TODO: initialize filesystem
-*/
 
     free(superblock);
-}
-
-/**
- * @brief Format the attached SPI flash
- *
- * This will erase the entire chip, then write in the superblock and format the underlying
- * filesystem as well. It will be empty.
- */
-static void FormatNor(Flash *flash) {
-    int err;
-
-    // erase the entire chip
-    Logger::Notice("Erasing NOR!");
-    err = flash->eraseChip();
-    REQUIRE(!err, "%s failed: %d", "erase NOR", err);
 }
