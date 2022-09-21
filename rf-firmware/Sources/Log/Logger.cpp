@@ -168,6 +168,8 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
                 xSemaphoreGiveFromISR(gUartCompletion, &woken);
                 portYIELD_FROM_ISR(woken);
             });
+            UARTDRV_Transmit(sl_uartdrv_eusart_tty_handle,
+                    reinterpret_cast<uint8_t *>(const_cast<char *>("\r\n")), 2, nullptr);
         } else {
             // scheduler isn't running, so write it out directly
             UARTDRV_ForceTransmit(sl_uartdrv_eusart_tty_handle, reinterpret_cast<uint8_t *>(bufferStart),

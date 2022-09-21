@@ -21,7 +21,7 @@ bool Fs::IdentifyFlash(etl::span<const uint8_t, 3> jdecId, const FlashInfo* &out
             static const FlashInfo info{
                 .manufacturerName       = "Winbond",
                 .partNumber             = "W25Q64JV-IQ/JQ",
-                .capacity               = 26,
+                .capacity               = 23,
                 .pageSize               = 8,
                 .sectorSize             = 12,
                 .blockSize              = 16,

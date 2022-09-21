@@ -14,6 +14,7 @@
 
 #include "Flash.h"
 #include "FlashInfo.h"
+#include "NorFs.h"
 #include "Init.h"
 
 using namespace Fs;
@@ -62,8 +63,7 @@ static void FormatNor(Flash *flash, Superblock *superblock) {
 
     // erase the entire chip
     Logger::Notice("Erasing NOR!");
-    //err = flash->eraseChip();
-    err = flash->eraseSector(kSuperblockAddress);
+    err = flash->eraseChip();
     REQUIRE(!err, "%s failed: %d", "erase NOR", err);
 
     // allocate superblock memory then populate it
@@ -77,7 +77,11 @@ static void FormatNor(Flash *flash, Superblock *superblock) {
     err = flash->write(kSuperblockAddress, superblockBytes);
     REQUIRE(!err, "%s failed: %d", "write superblock", err);
 
-    // TODO: initialize fs
+    // initialize filesystem
+    Logger::Notice("Formatting fs");
+    err = NorFs::Format(flash, superblock);
+
+    REQUIRE(!err, "%s failed: %d", "format fs", err);
 }
 
 /**
@@ -198,10 +202,18 @@ void Fs::Init() {
 
     REQUIRE(superblockValid, "flash superblock is invalid!");
 
-    // otherwise, initialize the filesystem
-
     Logger::Notice("Superblock (version %08x)", superblock->version);
-    // TODO: initialize filesystem
+
+    /*
+     * The superblock is valid, so initialize the filesystem. This ensures the filesystem type is
+     * supported, then starts the driver.
+     */
+    REQUIRE(superblock->fsType == Superblock::FsType::SPIFFS, "unsupported filesystem: %08x",
+            superblock->fsType);
+    Logger::Notice("Mounting filesystem");
+
+    err = NorFs::Mount(flash, superblock);
+    REQUIRE(!err, "%s failed: %d", "mount fs", err);
 
     free(superblock);
 }

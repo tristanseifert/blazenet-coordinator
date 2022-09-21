@@ -218,6 +218,62 @@ int Flash::writePage(const uintptr_t address, etl::span<const uint8_t> data) {
 }
 
 /**
+ * @brief Erase part of the flash
+ *
+ * Erases a section of the flash, starting at the given address. Both the address and length must
+ * be aligned on the smallest erase granularity (sector) boundary. We'll automagically try to use
+ * more efficient block erase commands if the size is large.
+ */
+int Flash::erase(const uintptr_t address, const size_t length) {
+    int err;
+
+    if(kLogErase) {
+        Logger::Notice("Erase(%06x) %u bytes", address, length);
+    }
+
+    // ensure everything is aligned to a sector boundary
+    if(address & (this->info->sectorSizeBytes() - 1)) {
+        return Error::UnalignedAddress;
+    }
+    else if(length & (this->info->sectorSizeBytes() - 1)) {
+        return Error::UnalignedSize;
+    }
+
+    // loop until all bytes are erased
+    size_t totalBytes = length, offset{0};
+    const auto sectorSize = this->info->sectorSizeBytes(),
+          blockSize = this->info->blockSizeBytes();
+
+    while(totalBytes) {
+        const auto start = address + offset;
+
+        // erase sector if not block aligned, or less than a block remains
+        if((start & (blockSize - 1)) || totalBytes < blockSize) {
+            err = this->eraseSector(start);
+            if(err) {
+                return err;
+            }
+
+            offset += sectorSize;
+            totalBytes -= sectorSize;
+        }
+        // otherwise, erase an entire block
+        else {
+            err = this->eraseBlock(start);
+            if(err) {
+                return err;
+            }
+
+            offset += blockSize;
+            totalBytes -= blockSize;
+        }
+    }
+
+    // successfully finished erasing
+    return Error::NoError;
+}
+
+/**
  * @brief Erase a sector
  *
  * Erase a sector starting at the given address.

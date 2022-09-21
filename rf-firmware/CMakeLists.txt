@@ -25,6 +25,8 @@ set(FREERTOS_CONFIG_FILE_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/Includes/FreeRTOS/
 
 # config path for the Gecko SDK files
 set(EFWB_GECKO_CONFIG_DIR "${CMAKE_CURRENT_LIST_DIR}/Includes/gecko-config/" CACHE STRING "")
+# config path for SPIFFS
+set(EFWB_SPIFFS_CONFIG_DIR "${CMAKE_CURRENT_LIST_DIR}/Includes/" CACHE STRING "")
 
 ###############
 # Get version information from Git and some additional build info
@@ -95,6 +97,7 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/Fs/Init.cpp
     Sources/Fs/Flash.cpp
     Sources/Fs/FlashInfo.cpp
+    Sources/Fs/NorFs.cpp
     Sources/Drivers/sl_spidrv_init.c
     Sources/Drivers/sl_uartdrv_init.c
 )
@@ -108,7 +111,7 @@ set_source_files_properties(Sources/Drivers/sl_uartdrv_init.c PROPERTIES COMPILE
 
 ####################################################################################################
 # Configure and include various external components
-target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor)
+target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor embedded-fw-base::spiffs)
 
 # FreeRTOS
 target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)

@@ -52,48 +52,25 @@ STACK_SIZE = 0x800;
 
 SECTIONS
 {
-
     .text ALIGN(16) :
     {
         KEEP(*(.isr_vector))
         KEEP(*(.vectors .vectors.*))
 
-        linker_code_begin = .;
         KEEP(*(.startup .startup.*))
 
         *(.text .text.* .gnu.linkonce.t.*)
         *(.glue_7t) *(.glue_7)
-        linker_code_end = .;
 
         KEEP(*(.init))
         KEEP(*(.fini))
-
-        /* .ctors */
-        *crtbegin.o(.ctors)
-        *crtbegin?.o(.ctors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
-        *(SORT(.ctors.*))
-        *(.ctors)
-
-        /* .dtors */
-        *crtbegin.o(.dtors)
-        *crtbegin?.o(.dtors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
-        *(SORT(.dtors.*))
-        *(.dtors)
-
-        *(.rodata*)
-        *(.eh_frame*)
     } > FLASH
 
     /* read-only data */
     .rodata ALIGN(16) :
     {
         *(.rodata .rodata* .gnu.linkonce.r.*)
-
-        . = ALIGN(4);
-        *(.ARM.extab* .gnu.linkonce.armextab.*)
-        *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+        *(.eh_frame*)
 
         /* Support C constructors, and C destructors in both user code
            and the C library. This also provides support for C++ code. */
@@ -122,6 +99,18 @@ SECTIONS
     } >FLASH
 
     __etext = .;
+
+    .ARM.extab :
+    {
+        *(.ARM.extab* .gnu.linkonce.armextab.*)
+    } > FLASH
+
+    __exidx_start = .;
+    .ARM.exidx :
+    {
+        *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+    } > FLASH
+    __exidx_end = .;
 
     /* Start placing output sections which are loaded into RAM */
     . = ORIGIN(RAM);

@@ -29,18 +29,20 @@ class Flash {
             NoError                             = 0,
             Success                             = NoError,
 
+            /// Size argument is not a multiple of a page/block size
+            UnalignedSize                       = -1000,
             /// Timeout waiting for an erase/write to complet
-            Timeout                             = -1,
+            Timeout                             = -1001,
             /// IO Error during command phase
-            IoCommand                           = -2,
+            IoCommand                           = -1002,
             /// IO Error during payload phase
-            IoPayload                           = -3,
+            IoPayload                           = -1003,
             /// Attempt to erase at an address not a multiple of the erase granularity
-            UnalignedAddress                    = -4,
+            UnalignedAddress                    = -1004,
             /// Attempt to write beyond a page boundary
-            PageWriteTooBig                     = -5,
+            PageWriteTooBig                     = -1005,
             /// Specified arguments are invalid
-            InvalidArguments                    = -6,
+            InvalidArguments                    = -1006,
         };
 
         Flash(const FlashInfo *info);
@@ -53,6 +55,7 @@ class Flash {
         int write(const uintptr_t address, etl::span<const uint8_t> data);
         int writePage(const uintptr_t address, etl::span<const uint8_t> data);
 
+        int erase(const uintptr_t address, const size_t length);
         int eraseSector(const uintptr_t address);
         int eraseBlock(const uintptr_t address);
         int eraseChip();
