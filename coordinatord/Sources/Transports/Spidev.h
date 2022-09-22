@@ -19,8 +19,21 @@ namespace Transports {
  */
 class Spidev: public Transport {
     private:
-        /// Encapsulates an opened gpio chip and line
-        using GpioPin = std::pair<struct gpiod_chip *, struct gpiod_line *>;
+        /**
+         * @brief Read command delay (µS)
+         *
+         * This is the time period that we'll delay after transmitting the command header, but
+         * before receiving the response for a "read" command.
+         */
+        constexpr static const size_t kReadCmdDelay{25};
+
+        /**
+         * @brief Write command delay (µS)
+         *
+         * This is the time period that we'll delay after transmitting the command header, but
+         * before sending the payload for "write" commands.
+         */
+        constexpr static const size_t kWriteCmdDelay{10};
 
         /**
          * @brief Command structure to send to radio
@@ -64,7 +77,7 @@ class Spidev: public Transport {
         struct event *irqLineEvent{nullptr};
 
         /// Reset line
-        std::optional<GpioPin> resetPin;
+        struct gpiod_line *resetLine{nullptr};
 };
 }
 

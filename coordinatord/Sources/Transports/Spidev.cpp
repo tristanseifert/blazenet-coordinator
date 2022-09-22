@@ -196,6 +196,10 @@ Spidev::~Spidev() {
         gpiod_line_close_chip(this->irqLine);
         this->irqLine = nullptr;
     }
+    if(this->resetLine) {
+        gpiod_line_close_chip(this->resetLine);
+        this->irqLine = nullptr;
+    }
 
     // close spidev
     if(this->spidev > 0) {
@@ -216,12 +220,52 @@ void Spidev::reset() {
     usleep(20 * 1000);
 }
 
+/**
+ * @brief Send a command, then read response
+ *
+ * Set up an SPI transaction to transmit the given command, then read the number of bytes specified
+ * (by the buffer size) from the controller.
+ *
+ * @param command Command id
+ * @param buffer Buffer to receive the response
+ */
 void Spidev::sendCommandWithResponse(const uint8_t command, std::span<uint8_t> buffer) {
-    // TODO: implement
+    int err;
+
+    // validate args and build command
+    if(buffer.empty()) {
+        throw std::invalid_argument("buffer empty");
+    } else if(buffer.size() > UINT8_MAX) {
+        throw std::invalid_argument("buffer too long");
+    } else if(command > 0x7F) {
+        throw std::invalid_argument("invalid command id");
+    }
+
+    Command cmd{static_cast<uint8_t>(command | 0x80), static_cast<uint8_t>(buffer.size())};
+
+    // build request structure
+    std::array<struct spi_ioc_transfer, 2> transfers{{
+        {
+            .tx_buf = reinterpret_cast<unsigned long>(&cmd),
+            .rx_buf = 0,
+            .len = sizeof(cmd),
+            .delay_usecs = kReadCmdDelay,
+        },
+        {
+            .tx_buf = 0,
+            .rx_buf = reinterpret_cast<unsigned long>(buffer.data()),
+            .len = buffer.size(),
+        }
+    }};
+
+    err = ioctl(this->spidev, SPI_IOC_MESSAGE(2), transfers.data());
+    if(err == -1) {
+        throw std::system_error(errno, std::generic_category(), __func__);
+    }
 }
 
 /**
- * @brief Send the given command and read a response
+ * @brief Send the given command with payload
  *
  * Set up an SPI transaction to send the given command, followed immediately by the given payload
  * bytes.
@@ -235,29 +279,30 @@ void Spidev::sendCommandWithPayload(const uint8_t command, std::span<const uint8
     // validate args and build command
     if(payload.size() > UINT8_MAX) {
         throw std::invalid_argument("payload too long");
+    } else if(command > 0x7F) {
+        throw std::invalid_argument("invalid command id");
     }
 
     Command cmd{command, static_cast<uint8_t>(payload.size())};
 
-    // TODO: why do we get ENOENT?
     // build request structure
     std::array<struct spi_ioc_transfer, 2> transfers{{
         {
-            .rx_buf = 0,
             .tx_buf = reinterpret_cast<unsigned long>(&cmd),
+            .rx_buf = 0,
             .len = sizeof(cmd),
-            .delay_usecs = 5,
+            .delay_usecs = kWriteCmdDelay,
         },
         {
-            .rx_buf = 0,
             .tx_buf = reinterpret_cast<unsigned long>(payload.data()),
+            .rx_buf = 0,
             .len = payload.size(),
         }
     }};
 
-    err = ioctl(this->spidev, SPI_IOC_MESSAGE(2), transfers.data());
-    if(err) {
-        throw std::system_error(errno, std::generic_category(), "send command");
+    err = ioctl(this->spidev, SPI_IOC_MESSAGE(payload.empty() ? 1 : 2), transfers.data());
+    if(err == -1) {
+        throw std::system_error(errno, std::generic_category(), __func__);
     }
 }
 
