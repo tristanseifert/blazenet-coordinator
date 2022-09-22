@@ -92,6 +92,16 @@ add_executable(daemon
     Sources/Support/Watchdog.cpp
 )
 
+# Linux-specific transports (TODO: on FreeBSD also?)
+if(UNIX AND NOT APPLE)
+    target_sources(daemon PRIVATE
+        Sources/Transports/Spidev.cpp
+    )
+    target_compile_definitions(daemon PRIVATE -DWITH_TRANSPORT_SPIDEV)
+
+    target_link_libraries(daemon PRIVATE gpiod)
+endif()
+
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
 target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt OpenSSL::SSL

@@ -115,6 +115,7 @@ int main(int argc, char **argv) {
 
     // initialize the event loop, then read config (which may attach of event sources)
     gMainLoop = std::make_shared<Support::EventLoop>(true);
+    gMainLoop->arm();
 
     try {
         Config::Read(gCliConfig.configFilePath);
