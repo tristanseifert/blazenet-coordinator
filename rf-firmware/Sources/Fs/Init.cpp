@@ -2,15 +2,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <etl/array.h>
-
-#include "em_device.h"
-#include "em_gpio.h"
+#include <Util/Crc32.h>
+#include <em_device.h>
+#include <em_gpio.h>
 
 #include "Drivers/sl_spidrv_instances.h"
 #include "sl_spidrv_eusart_flash_config.h"
 
 #include "Log/Logger.h"
-#include "Util/Crc32.h"
 
 #include "Flash.h"
 #include "FlashInfo.h"

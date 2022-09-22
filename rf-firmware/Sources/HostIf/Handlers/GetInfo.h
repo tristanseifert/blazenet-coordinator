@@ -7,6 +7,7 @@
 
 #include "BuildInfo.h"
 #include "HostIf/Commands.h"
+#include "Hw/Identity.h"
 
 namespace HostIf::Handlers {
 /**
@@ -30,10 +31,12 @@ struct GetInfo {
         info->fw.minor = 0x01;
         strncpy(info->fw.build, gBuildInfo.gitHash, sizeof(info->fw.build));
 
-        // TODO: get hardware information
+        // hardware information
         info->hw.rev = 1;
         info->hw.features = Response::GetInfo::HwFeatures::PrivateStorage;
-        strncpy(info->fw.build, gBuildInfo.gitHash, sizeof(info->fw.build));
+
+        strncpy(info->hw.serial, Hw::Identity::GetSerial(), sizeof(info->hw.serial));
+        memcpy(info->hw.eui64, Hw::Identity::GetEui64().data(), sizeof(info->hw.eui64));
 
         // radio info (TODO: get actual data)
         info->radio.maxTxPower = 140;

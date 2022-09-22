@@ -11,6 +11,7 @@
 #include "Fs/Init.h"
 #include "HostIf/Init.h"
 #include "Hw/Clocks.h"
+#include "Hw/Identity.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
 #include "Radio/Init.h"
@@ -30,6 +31,9 @@ static void EarlyInit() {
 
     // set up logging
     Logger::Init();
+
+    // read out system identity information
+    Hw::Identity::Init();
 }
 
 /**
