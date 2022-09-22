@@ -10,6 +10,10 @@
 
 #include "Rtos/Rtos.h"
 
+extern "C" {
+void sl_rail_util_on_event(RAIL_Handle_t, RAIL_Events_t);
+};
+
 namespace Radio {
 /**
  * @brief Radio management task
@@ -19,6 +23,8 @@ namespace Radio {
  * queues packets for transmission.
  */
 class Task {
+    friend void ::sl_rail_util_on_event(RAIL_Handle_t, RAIL_Events_t);
+
     private:
         /// Runtime priority level
         static const constexpr uint8_t kPriority{Rtos::TaskPriority::AppHigh};
@@ -36,9 +42,12 @@ class Task {
          * Whenever there's a radio-related ~ thing ~ to do, we'll send a notification to the
          * radio task. Many of these will come directly from RAIL.
          */
-        enum TaskNotifyBits: uintptr_t {
+        enum NotifyBits: uintptr_t {
+            /// A new packet has been received and is available
+            PacketReceived                      = (1 << 0),
+
             /// Bitwise OR of all supported task notification bits
-            All                                 = (0xFFFFFFFFU),
+            All                                 = (PacketReceived),
         };
 
     public:
@@ -47,11 +56,20 @@ class Task {
     private:
         static void Main();
 
+        static void ReadPacket();
+
     private:
         /// FreeRTOS Task handle
         static TaskHandle_t gTask;
         /// Radio interface handle (used for all later interfaces)
         static RAIL_Handle_t gRail;
+
+        /// Performance counter to track the number of receive overflows
+        static size_t gRxFifoOverflows;
+        /// Number of frames received with errors (invalid CRC, etc.)
+        static size_t gRxFrameErrors;
+        /// Number of good frames received
+        static size_t gRxFrames;
 };
 }
 

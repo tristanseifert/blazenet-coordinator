@@ -3,12 +3,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
-
-#include "Rtos/Rtos.h"
-
 #include <etl/array.h>
 #include <etl/span.h>
 #include <etl/utility.h>
+#include <em_gpio.h>
+
+#include "Rtos/Rtos.h"
 
 namespace Hw {
 /**
