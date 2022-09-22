@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <etl/array.h>
+#include <etl/span.h>
 #include <etl/string_view.h>
 
 #include "Rtos/Rtos.h"
@@ -37,7 +38,13 @@ class Task {
          * length of the payload.
          */
         struct Command {
-            /// Command id
+            /**
+             * @brief Command identifier
+             *
+             * Command IDs are 7 bits in length. The high bit of the command is used to indicate
+             * that the host is _reading_ data from the controller, rather than the other way
+             * around.
+             */
             uint8_t command;
             /// Number of payload bytes following the command
             uint8_t payloadLength;
@@ -54,9 +61,12 @@ class Task {
             CmdReceiveComplete                  = (1U << 0),
             /// Payload reception complete
             PayloadReceiveComplete              = (1U << 1),
+            /// Response transmission complete
+            ResponseTransmitComplete            = (1U << 2),
 
             /// Bitwise OR of all supported task notification bits
-            All                                 = (CmdReceiveComplete | PayloadReceiveComplete),
+            All                                 = (CmdReceiveComplete | PayloadReceiveComplete |
+                    ResponseTransmitComplete),
         };
 
     public:
@@ -64,6 +74,9 @@ class Task {
 
     private:
         static void Main();
+        static void ProcessCommand();
+        static void DispatchCommand(const uint8_t, etl::span<uint8_t>);
+        static void DispatchCommandWithResponse(const uint8_t, const size_t);
 
         static void ReadCommand();
         static void ReadPayload(const size_t);
@@ -89,6 +102,8 @@ class Task {
         static bool gCommandBufferValid;
         /// Command structure received from host
         static Command gCommandBuffer;
+        /// Number of payload bytes received
+        static size_t gPayloadBytesReceived;
         /// Buffer for command payload
         static etl::array<uint8_t, kMaxPayloadSize> gPayloadBuffer;
 
