@@ -24,7 +24,7 @@
 // <h> EUSART settings
 // <o SL_UARTDRV_EUSART_TTY_BAUDRATE> Baud rate
 // <i> Default: 115200
-#define SL_UARTDRV_EUSART_TTY_BAUDRATE        4000000
+#define SL_UARTDRV_EUSART_TTY_BAUDRATE        3500000
 
 // <o SL_UARTDRV_EUSART_TTY_LF_MODE> Low frequency mode
 // <true=> True

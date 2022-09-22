@@ -9,6 +9,7 @@
 
 #include "BuildInfo.h"
 #include "Fs/Init.h"
+#include "HostIf/Init.h"
 #include "Hw/Clocks.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
@@ -59,6 +60,9 @@ static void SwInit() {
 
     // radio hardware and RAIL stack
     Radio::Init();
+
+    // host interface
+    HostIf::Init();
 }
 
 

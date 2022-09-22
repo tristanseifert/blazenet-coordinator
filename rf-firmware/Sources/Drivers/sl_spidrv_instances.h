@@ -7,6 +7,7 @@ extern "C" {
 
 #include "spidrv.h"
 extern SPIDRV_Handle_t sl_spidrv_eusart_flash_handle;
+extern SPIDRV_Handle_t sl_spidrv_eusart_host_handle;
 
 void sl_spidrv_init_instances(void);
 

@@ -10,21 +10,6 @@
 using namespace Fs;
 
 /**
- * @brief Execute the JEDEC "identify" command and return its results
- *
- * @param jedecId Buffer to receive the three byte JEDEC ID
- */
-/*
-
-    GPIO_PinOutClear(SL_SPIDRV_EUSART_FLASH_CS_PORT, SL_SPIDRV_EUSART_FLASH_CS_PIN);
-    ok = SPIDRV_MTransferB(sl_spidrv_eusart_flash_handle, txBuf.data(), rxBuf.data(),
-            txBuf.size());
-    GPIO_PinOutSet(SL_SPIDRV_EUSART_FLASH_CS_PORT, SL_SPIDRV_EUSART_FLASH_CS_PIN);
-
-    REQUIRE(ok == ECODE_EMDRV_SPIDRV_OK, "%s failed: %d", "SPIDRV_MTransfer", ok);
-    */
-
-/**
  * @brief Initialize the flash wrapper instance
  *
  * @param info Flash information descriptor

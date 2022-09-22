@@ -185,17 +185,17 @@
 // [MODEM]$
 
 // $[CUSTOM_PIN_NAME]
-#define PMIC_nIRQ_PORT                           gpioPortA
-#define PMIC_nIRQ_PIN                            0
+#define HOST_nIRQ_PORT                           gpioPortA
+#define HOST_nIRQ_PIN                            0
 
 #define HOST_SPI_SCK_PORT                        gpioPortA
 #define HOST_SPI_SCK_PIN                         4
 
-#define HOST_SPI_MISO_PORT                       gpioPortA
-#define HOST_SPI_MISO_PIN                        5
-
 #define HOST_SPI_MOSI_PORT                       gpioPortA
-#define HOST_SPI_MOSI_PIN                        6
+#define HOST_SPI_MOSI_PIN                        5
+
+#define HOST_SPI_MISO_PORT                       gpioPortA
+#define HOST_SPI_MISO_PIN                        6
 
 #define HOST_SPI_nCS_PORT                        gpioPortA
 #define HOST_SPI_nCS_PIN                         7
@@ -205,9 +205,6 @@
 
 #define TTY_TX_PORT                              gpioPortA
 #define TTY_TX_PIN                               9
-
-#define HOST_SPI_nIRQ_PORT                       gpioPortB
-#define HOST_SPI_nIRQ_PIN                        2
 
 #define FLASH_SPI_SCK_PORT                       gpioPortC
 #define FLASH_SPI_SCK_PIN                        0

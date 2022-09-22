@@ -98,6 +98,8 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/Fs/Flash.cpp
     Sources/Fs/FlashInfo.cpp
     Sources/Fs/NorFs.cpp
+    Sources/HostIf/Init.cpp
+    Sources/HostIf/Task.cpp
     Sources/Drivers/sl_spidrv_init.c
     Sources/Drivers/sl_uartdrv_init.c
 )
