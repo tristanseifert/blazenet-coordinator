@@ -147,25 +147,21 @@ SECTIONS
     } >RAM
     _bsslen = _ebss - _sbss;
 
+    /* end of regular, loaded regions */
+    __end__ = .;
+    end = __end__;
+    _end = __end__;
+
     /* boot and interrupt stack */
-    .stack ALIGN(16) (NOLOAD):
-    {
-        _sstack = .;
-        . = . + STACK_SIZE;
-        . = ALIGN(16);
-        _estack = .;
-    } > RAM
+    . = ALIGN(16);
+
+    PROVIDE_HIDDEN(_sstack = .);
+    . = . + STACK_SIZE;
+    PROVIDE_HIDDEN(_estack = .);
 
     /* remainder of RAM is available as a heap */
-    .heap ALIGN(16) (NOLOAD):
-    {
-        PROVIDE_HIDDEN(_sheap = .);
-        __end__ = .;
-        end = __end__;
-        _end = __end__;
-        . = ORIGIN(RAM) + LENGTH(RAM);
-        PROVIDE_HIDDEN(_eheap = .);
-    } >RAM
+    PROVIDE_HIDDEN(_sheap = .);
+    PROVIDE_HIDDEN(_eheap = ORIGIN(RAM) + LENGTH(RAM));
 
     /* this is where we might add sections for NVM3 driver */
 }

@@ -8,9 +8,27 @@
 #include <etl/span.h>
 #include <etl/string_view.h>
 
+#include "gecko-config/pin_config.h"
+#include "em_gpio.h"
+
+#include "bitflags.h"
 #include "Rtos/Rtos.h"
 
 namespace HostIf {
+/**
+ * @brief Flags for command handlers
+ *
+ * These flags are used in the command handler table to determine various capabilities of a
+ * command handler.
+ */
+enum class HandlerFlags: uintptr_t {
+    /// Does the handler support reads?
+    SupportsRead                                = (1 << 0),
+    /// Does the handler support writes?
+    SupportsWrite                               = (1 << 1),
+};
+ENUM_FLAGS_EX(HandlerFlags, uintptr_t);
+
 /**
  * @brief Host interface task
  *
@@ -30,25 +48,40 @@ class Task {
 
         /// Maximum payload size (bytes)
         static const constexpr size_t kMaxPayloadSize{256};
+        /// Maximum supported command id (TODO: keep in sync with CommandId enum)
+        static const constexpr size_t kMaxCommandId{0x03};
 
         /**
-         * @brief Host command structure
+         * @brief Command handler
          *
-         * A small, packed structure received from the host. It indicates the command id and the
-         * length of the payload.
+         * Defines a handler for a host command. These commands are implemented by means of
+         * callbacks executed by the worker task to produce or receive data. Callbacks must be as
+         * short as possible to avoid occupying the handler task, which would prevent further
+         * commands from being handled.
          */
-        struct Command {
+        struct CommandHandler {
+            /// Flags
+            HandlerFlags flags;
+
             /**
-             * @brief Command identifier
+             * @brief Read callback
              *
-             * Command IDs are 7 bits in length. The high bit of the command is used to indicate
-             * that the host is _reading_ data from the controller, rather than the other way
-             * around.
+             * Invoked when the host requests this command and desires to read back data. The
+             * handler shall fill the provided buffer.
+             *
+             * @return Number of bytes actually written to buffer, or a negative error code
              */
-            uint8_t command;
-            /// Number of payload bytes following the command
-            uint8_t payloadLength;
-        } __attribute__((packed));
+            int (*read)(const uint8_t, const size_t, etl::span<uint8_t>);
+
+            /**
+             * @brief Write callback
+             *
+             * Invoked when the host executes this command and provides a payload.
+             *
+             * @return 0 on success, or a negative error code
+             */
+            int (*write)(const uint8_t, etl::span<const uint8_t>);
+        };
 
     public:
         /**
@@ -95,18 +128,20 @@ class Task {
         }
 
     private:
+        /// Global command handlers
+        static const etl::array<const CommandHandler, kMaxCommandId> gHandlers;
+
         /// FreeRTOS Task handle
         static TaskHandle_t gTask;
 
         /// Is the command buffer valid?
         static bool gCommandBufferValid;
         /// Command structure received from host
-        static Command gCommandBuffer;
+        static struct CommandHeader gCommandBuffer;
         /// Number of payload bytes received
         static size_t gPayloadBytesReceived;
-        /// Buffer for command payload
+        /// Buffer for command payload (shared between rx and tx)
         static etl::array<uint8_t, kMaxPayloadSize> gPayloadBuffer;
-
 };
 }
 
