@@ -79,6 +79,15 @@ enum class CommandId: uint8_t {
      * Reads are supported.
      */
     ReadPacket                                  = 0x06,
+
+    /**
+     * @brief Transmit packet
+     *
+     * Queue a packet for transmission over the air.
+     *
+     * Writes are supported.
+     */
+    TransmitPacket                              = 0x07,
 };
 
 /**
@@ -224,6 +233,28 @@ struct RadioConfig {
      * lower transmit power.
      */
     uint16_t txPower;
+} __attribute__((packed));
+
+/**
+ * @brief "TransmitPacket" command
+ *
+ * Enqueues a packet into the radio's transmit queue, which will cause it to be transmitted
+ * immediately (if radio is available) or after any pending transmissions have completed.
+ */
+struct TransmitPacket {
+    /**
+     * @brief Packet priority value
+     *
+     * Indicates the relative priority of the packet, used for queuing the packet while it's
+     * waiting for transmission.
+     *
+     * @remark Numerically _low_ values correspond to _low_ priorities, e.g. 0 is lowest.
+     */
+    uint8_t priority                            :2;
+    uint8_t reserved                            :6;
+
+    /// Packet payload data (including MAC headers)
+    uint8_t data[];
 } __attribute__((packed));
 }
 }

@@ -36,6 +36,14 @@ class Spidev: public TransportBase {
          */
         constexpr static const size_t kWriteCmdDelay{10};
 
+        /**
+         * @brief Post-command delay (µS)
+         *
+         * A delay period that's inserted after all commands, to allow for turnaround time in the
+         * software.
+         */
+        constexpr static const size_t kPostCmdDelay{25};
+
     public:
         Spidev(const toml::table &config);
         ~Spidev();

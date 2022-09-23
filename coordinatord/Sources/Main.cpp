@@ -96,7 +96,7 @@ static void ParseArgs(const int argc, char **argv) {
  * Sets up the radio configuration (channel, power, etc.)
  */
 static void ConfigureRadio(const std::shared_ptr<Radio> &radio) {
-    radio->setChannel(6);
+    radio->setChannel(9);
     radio->setTxPower(80);
     radio->uploadConfig();
 }

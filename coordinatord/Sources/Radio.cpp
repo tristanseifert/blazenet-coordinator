@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cstring>
+#include <functional>
 #include <stdexcept>
 #include <fmt/format.h>
 
@@ -74,6 +76,8 @@ Radio::~Radio() {
  * we have stored.
  */
 void Radio::uploadConfig() {
+    Transports::Response::GetStatus status;
+
     // build the command
     Transports::Request::RadioConfig conf;
 
@@ -81,14 +85,62 @@ void Radio::uploadConfig() {
     conf.txPower = this->currentTxPower;
 
     // then submit it
+    std::lock_guard lg(this->transportLock);
     this->transport->sendCommandWithPayload(Transports::CommandId::RadioConfig,
             {reinterpret_cast<std::byte *>(&conf), sizeof(conf)});
 
-    // TODO: check for error
+    // check that the packet was queued (error flag not set)
+    this->queryStatus(status);
+    if(status.errorFlag) {
+        throw std::runtime_error("failed to set radio config");
+    }
 
     this->isConfigDirty = false;
 }
 
+/**
+ * @brief Inscrete a packet for transmission
+ *
+ * Submit the specified packet for transmission.
+ *
+ * If there are no packets pending in the queue, the packet is written directly to the radio, but
+ * otherwise it's just appended to the queue and when the next "tx complete" interrupt arrives,
+ * will get sent.
+ *
+ * @param priority Priority level of the packet (for queuing)
+ * @param payload Packet data to transmit (including PHY and MAC headers)
+ */
+void Radio::queueTransmitPacket(const PacketPriority priority,
+        std::span<const std::byte> payload) {
+    // if queue is empty, transmit the packet right away
+    std::lock_guard lg(this->txQueueLock);
+    if(std::all_of(this->txQueues.begin(), this->txQueues.end(),
+                std::bind(&TxQueue::empty, std::placeholders::_1))) {
+        // build the packet header
+        Transports::Request::TransmitPacket header;
+        header.priority = static_cast<uint8_t>(priority);
+
+        // transmit to radio
+        std::lock_guard lg(this->transportLock);
+
+        try {
+            this->transmitPacket(header, payload);
+
+            // on success, we're done
+            return;
+        } catch(const std::exception &e) {
+            PLOG_WARNING << "failed to direct tx packet: " << e.what();
+        }
+    }
+
+    // otherwise (on error or stuff in queue,) queue the packet as normal for later
+    auto pbuf = std::make_unique<TxPacket>();
+    pbuf->priority = priority;
+    pbuf->payload.resize(payload.size());
+    std::copy(payload.begin(), payload.end(), pbuf->payload.begin());
+
+    this->txQueues.at(static_cast<size_t>(priority)).emplace(std::move(pbuf));
+}
 
 
 /**
@@ -100,6 +152,8 @@ void Radio::uploadConfig() {
 void Radio::irqHandler() {
     bool checkAgain;
     Transports::Response::GetStatus status;
+
+    std::lock_guard lg(this->transportLock);
 
     // read status until we've serviced everything that needs servicing
     do {
@@ -116,6 +170,11 @@ void Radio::irqHandler() {
         if(status.rxQueueOverflow) {
             // TODO: reset overflow flag
             // checkAgain = true;
+        }
+
+        // transmit queue is empty
+        if(status.txQueueEmpty) {
+            // TODO: send pending queued packets
         }
     } while(checkAgain);
 }
@@ -200,4 +259,32 @@ void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
 
     std::copy(this->rxBuffer.begin() + offsetof(Transports::Response::ReadPacket, payload),
             this->rxBuffer.end(), payloadBuf.begin());
+}
+
+/**
+ * @brief Send a packet to the radio
+ *
+ * The packet will be queued for transmission in the radio's internal buffer, and then secreted
+ * on to the air… eventually.
+ *
+ * @param header General information about the packet to transmit
+ * @param payload Packet payload (including PHY and MAC headers)
+ */
+void Radio::transmitPacket(const Transports::Request::TransmitPacket &header,
+        std::span<const std::byte> payload) {
+    Transports::Response::GetStatus status;
+
+    // prepare the transmit buffer
+    this->txBuffer.resize(sizeof(header) + payload.size());
+    memcpy(this->txBuffer.data(), &header, sizeof(header));
+    memcpy(this->txBuffer.data() + sizeof(header), payload.data(), payload.size());
+
+    // perform request
+    this->transport->sendCommandWithPayload(Transports::CommandId::TransmitPacket, this->txBuffer);
+
+    // check that the packet was queued (error flag not set)
+    this->queryStatus(status);
+    if(status.errorFlag) {
+        throw std::runtime_error("radio reported error on queuing packet");
+    }
 }

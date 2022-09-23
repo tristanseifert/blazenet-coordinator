@@ -1,7 +1,9 @@
 #ifndef PROTOCOL_HANDLER_H
 #define PROTOCOL_HANDLER_H
 
+#include <cstddef>
 #include <memory>
+#include <vector>
 
 class Radio;
 
@@ -19,8 +21,18 @@ class Handler {
         ~Handler();
 
     private:
+        void initBeaconBuffer();
+        void initBeaconTimer();
+        void sendBeacon();
+
+    private:
         /// Underlying radio we're communicating with
         std::shared_ptr<Radio> radio;
+
+        /// timer event for beacon frames
+        struct event *beaconTimerEvent{nullptr};
+        /// Buffer for beacon frames
+        std::vector<std::byte> beaconBuffer;
 };
 }
 

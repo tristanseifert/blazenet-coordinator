@@ -265,7 +265,7 @@ void Spidev::reset() {
      * other long-running maintenance operation is ongoing. We assume those take place while the
      * Linux system we're running on is booting.
      */
-    usleep(250 * 1000);
+    usleep(500 * 1000);
 }
 
 /**
@@ -304,6 +304,7 @@ void Spidev::sendCommandWithResponse(const CommandId command, std::span<std::byt
             .tx_buf = 0,
             .rx_buf = reinterpret_cast<unsigned long>(buffer.data()),
             .len = buffer.size(),
+            .delay_usecs = kPostCmdDelay,
         }
     }};
 
@@ -346,6 +347,7 @@ void Spidev::sendCommandWithPayload(const CommandId command, std::span<const std
             .tx_buf = reinterpret_cast<unsigned long>(payload.data()),
             .rx_buf = 0,
             .len = payload.size(),
+            .delay_usecs = kPostCmdDelay,
         }
     }};
 

@@ -3,9 +3,12 @@
 
 #include <array>
 #include <cstddef>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <span>
 #include <vector>
+#include <queue>
 
 namespace Transports {
 class TransportBase;
@@ -16,16 +19,84 @@ struct GetStatus;
 struct GetPacketQueueStatus;
 struct ReadPacket;
 }
+
+namespace Request {
+struct TransmitPacket;
+}
 }
 
 /**
  * @brief Interface to a radio
  *
  * Provides an interface to a radio, attached to the system through an underlying transport. This
- * class encapsulates all of the logic in formatting commands.
+ * class encapsulates all of the logic in formatting commands, and also owns a transmit queue
+ * which holds packets until they're ready to be handled by the physical radio (with limited
+ * buffer space.)
  */
 class Radio {
+    public:
+        /**
+         * @brief Packet priority values
+         *
+         * Several virtual queues exist in both the radio and our internal queue, which are divided
+         * by the packet's priority.
+         */
+        enum class PacketPriority: uint8_t {
+            /**
+             * @brief Background/idle
+             *
+             * This is the lowest priority, for traffic that is not time critical. There is no
+             * guarantee that packets in this queue are transmitted.
+             */
+            Background                          = 0x00,
+
+            /**
+             * @brief Standard
+             *
+             * Normal packets with no special requirements.
+             */
+            Normal                              = 0x01,
+
+            /**
+             * @brief Real time
+             *
+             * Packets that should be sent immediately, such as for controlling a device.
+             */
+            RealTime                            = 0x02,
+
+            /**
+             * @brief Network control
+             *
+             * For network control purposes, we really don't want to have the packets stalled, so
+             * they get a super high priority queue.
+             */
+            NetworkControl                      = 0x03,
+
+            /// Maximum valid priority level value
+            MaxLevel                            = NetworkControl,
+            /// Total number of priority levels
+            NumLevels,
+        };
+
     private:
+        /**
+         * @brief Structure representing a packet pending transmission
+         */
+        struct TxPacket {
+            /// Transmission priority
+            PacketPriority priority;
+
+            /**
+             * @brief Packet data
+             *
+             * This is the raw data to be transmitted in this packet. It must have all headers
+             * already applied, including a PHY length counter in the first byte.
+             */
+            std::vector<std::byte> payload;
+        };
+
+        using TxQueue = std::queue<std::unique_ptr<TxPacket>>;
+
         /// Supported protocol version
         constexpr static const uint8_t kProtocolVersion{0x01};
 
@@ -60,6 +131,9 @@ class Radio {
 
         void uploadConfig();
 
+        void queueTransmitPacket(const PacketPriority priority,
+                std::span<const std::byte> payload);
+
     private:
         void irqHandler();
         void readPacket();
@@ -68,11 +142,21 @@ class Radio {
         void queryStatus(Transports::Response::GetStatus &);
         void queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &);
         void readPacket(Transports::Response::ReadPacket &, std::span<std::byte>);
+        void transmitPacket(const Transports::Request::TransmitPacket &,
+                std::span<const std::byte>);
 
     private:
         /// Interface used to communicate with the radio
         std::shared_ptr<Transports::TransportBase> transport;
+        /// Lock guarding accesses to the radio
+        std::mutex transportLock;
 
+        /// Transmit packet queues
+        std::array<TxQueue, 4> txQueues;
+        /// Lock guarding accesses to the transmit queue
+        std::mutex txQueueLock;
+        /// Buffer used for transmitting packets
+        std::vector<std::byte> txBuffer;
         /// Buffer used for receiving packets
         std::vector<std::byte> rxBuffer;
 
