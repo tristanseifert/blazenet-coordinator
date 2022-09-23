@@ -67,14 +67,14 @@ class Radio {
         void queryRadioInfo(Transports::Response::GetInfo &);
         void queryStatus(Transports::Response::GetStatus &);
         void queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &);
-        void readPacket(Transports::Response::ReadPacket &, std::span<uint8_t>);
+        void readPacket(Transports::Response::ReadPacket &, std::span<std::byte>);
 
     private:
         /// Interface used to communicate with the radio
         std::shared_ptr<Transports::TransportBase> transport;
 
         /// Buffer used for receiving packets
-        std::vector<uint8_t> rxBuffer;
+        std::vector<std::byte> rxBuffer;
 
         /// EUI-64 address of the radio
         std::array<std::byte, 8> eui64;

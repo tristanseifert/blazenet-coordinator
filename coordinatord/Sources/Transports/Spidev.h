@@ -36,18 +36,15 @@ class Spidev: public TransportBase {
          */
         constexpr static const size_t kWriteCmdDelay{10};
 
-        /// GPIO provider name
-        constexpr static const std::string_view kGpioProviderName{"blazed-spidev"};
-
     public:
         Spidev(const toml::table &config);
         ~Spidev();
 
         void reset() override;
 
-        void sendCommandWithResponse(const CommandId command, std::span<uint8_t> buffer) override;
+        void sendCommandWithResponse(const CommandId command, std::span<std::byte> buffer) override;
         void sendCommandWithPayload(const CommandId command,
-                std::span<const uint8_t> payload) override;
+                std::span<const std::byte> payload) override;
 
     private:
         void openSpidev(const toml::table &);

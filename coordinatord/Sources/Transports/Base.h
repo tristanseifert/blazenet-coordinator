@@ -39,7 +39,7 @@ class TransportBase {
          * @param buffer Buffer to receive the command response
          */
         virtual void sendCommandWithResponse(const CommandId command,
-                std::span<uint8_t> buffer) = 0;
+                std::span<std::byte> buffer) = 0;
 
         /**
          * @brief Send a command with payload
@@ -48,7 +48,7 @@ class TransportBase {
          * @param payload Data payload to send with the command
          */
         virtual void sendCommandWithPayload(const CommandId command,
-                std::span<const uint8_t> payload) = 0;
+                std::span<const std::byte> payload) = 0;
 
         /**
          * @brief Register an interrupt handler

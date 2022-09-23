@@ -120,7 +120,7 @@ void Spidev::initIrq(const std::string &lineDesc) {
     int err, eventFd;
     const auto [chipName, pin] = ParseGpio(lineDesc);
 
-    PLOG_INFO << "IRQ line: " << fmt::format("{} (chip '{}', line {})", lineDesc, chipName, pin);
+    PLOG_DEBUG << "IRQ line: " << fmt::format("{} (chip '{}', line {})", lineDesc, chipName, pin);
 
     // get the IO line
     auto line = gpiod_line_get(chipName.c_str(), pin);
@@ -130,7 +130,7 @@ void Spidev::initIrq(const std::string &lineDesc) {
     }
 
     // get falling edge interrupts
-    err = gpiod_line_request_falling_edge_events(line, kGpioProviderName.data());
+    err = gpiod_line_request_falling_edge_events(line, "blazed-spidev-irq");
     if(err) {
         gpiod_line_close_chip(line);
         throw std::system_error(errno, std::generic_category(),
@@ -153,7 +153,7 @@ void Spidev::initIrq(const std::string &lineDesc) {
     }
 
     auto evbase = Support::EventLoop::Current()->getEvBase();
-    auto ev = event_new(evbase, eventFd, EV_READ, [](auto fd, auto ev, auto ctx) {
+    auto ev = event_new(evbase, eventFd, EV_READ | EV_PERSIST, [](auto fd, auto ev, auto ctx) {
         reinterpret_cast<Spidev *>(ctx)->handleIrq(fd, ev);
     }, this);
 
@@ -172,10 +172,32 @@ void Spidev::initIrq(const std::string &lineDesc) {
  *
  * Configure the line as an open drain output.
  *
- * @param line IO line description, in the format of `gpiochip:pin`
+ * @paramDesc line IO line description, in the format of `gpiochip:pin`
  */
-void Spidev::initReset(const std::string &line) {
-    // TODO: implement
+void Spidev::initReset(const std::string &lineDesc) {
+    int err;
+    const auto [chipName, pin] = ParseGpio(lineDesc);
+
+    PLOG_DEBUG << "Reset line: " << fmt::format("{} (chip '{}', line {})", lineDesc, chipName, pin);
+
+    // get the IO line
+    auto line = gpiod_line_get(chipName.c_str(), pin);
+    if(!line) {
+        throw std::system_error(errno, std::generic_category(),
+                fmt::format("failed to get reset ({})", lineDesc));
+    }
+
+    // request as output
+    err = gpiod_line_request_output_flags(line, "blazed-spidev-reset",
+            GPIOD_LINE_REQUEST_FLAG_OPEN_DRAIN | GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP |
+            GPIOD_LINE_REQUEST_FLAG_ACTIVE_LOW,
+            false);
+    if(err) {
+        throw std::system_error(errno, std::generic_category(),
+            fmt::format("request reset line ({})", lineDesc));
+    }
+
+    this->resetLine = line;
 }
 
 /**
@@ -216,8 +238,34 @@ Spidev::~Spidev() {
  * This toggles the reset line low for ~20ms.
  */
 void Spidev::reset() {
-    // TODO: implement
+    int err;
+    if(!this->resetLine) {
+        return;
+    }
+
+    // assert reset
+    err = gpiod_line_set_value(this->resetLine, true);
+    if(err) {
+        throw std::system_error(errno, std::generic_category(), "assert reset line");
+    }
+
+    // wait for reset to complete
     usleep(20 * 1000);
+
+    // then release (deasert) the line
+    err = gpiod_line_set_value(this->resetLine, false);
+    if(err) {
+        throw std::system_error(errno, std::generic_category(), "deassert reset line");
+    }
+
+    /*
+     * Wait for the controller to boot up
+     *
+     * This may take significantly longer (~30 sec) if the external flash needs formatting, or some
+     * other long-running maintenance operation is ongoing. We assume those take place while the
+     * Linux system we're running on is booting.
+     */
+    usleep(250 * 1000);
 }
 
 /**
@@ -229,7 +277,7 @@ void Spidev::reset() {
  * @param command Command id
  * @param buffer Buffer to receive the response
  */
-void Spidev::sendCommandWithResponse(const CommandId command, std::span<uint8_t> buffer) {
+void Spidev::sendCommandWithResponse(const CommandId command, std::span<std::byte> buffer) {
     int err;
 
     // validate args and build command
@@ -274,7 +322,7 @@ void Spidev::sendCommandWithResponse(const CommandId command, std::span<uint8_t>
  * @param command Command id
  * @param payload Payload data to send immediately after
  */
-void Spidev::sendCommandWithPayload(const CommandId command, std::span<const uint8_t> payload) {
+void Spidev::sendCommandWithPayload(const CommandId command, std::span<const std::byte> payload) {
     int err;
 
     // validate args and build command

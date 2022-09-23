@@ -15,6 +15,11 @@
  * configuration.
  */
 Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : transport(_transport) {
+    /*
+     * Do initial setup: register an irq handler and reset the radio.
+     */
+    this->transport->reset();
+
     this->transport->addIrqHandler([&](){
         this->irqHandler();
     });
@@ -77,7 +82,7 @@ void Radio::uploadConfig() {
 
     // then submit it
     this->transport->sendCommandWithPayload(Transports::CommandId::RadioConfig,
-            {reinterpret_cast<uint8_t *>(&conf), sizeof(conf)});
+            {reinterpret_cast<std::byte *>(&conf), sizeof(conf)});
 
     // TODO: check for error
 
@@ -124,7 +129,7 @@ void Radio::irqHandler() {
 void Radio::readPacket() {
     Transports::Response::GetPacketQueueStatus status;
     Transports::Response::ReadPacket packet;
-    std::vector<uint8_t> packetData;
+    std::vector<std::byte> packetData;
 
     // read packet queue status
     this->queryPacketQueueStatus(status);
@@ -148,7 +153,7 @@ void Radio::readPacket() {
  */
 void Radio::queryRadioInfo(Transports::Response::GetInfo &outInfo) {
     this->transport->sendCommandWithResponse(Transports::CommandId::GetInfo,
-            {reinterpret_cast<uint8_t *>(&outInfo), sizeof(outInfo)});
+            {reinterpret_cast<std::byte *>(&outInfo), sizeof(outInfo)});
 
     if(outInfo.status != 1) {
         throw std::runtime_error(fmt::format("failed to get radio info: {}", outInfo.status));
@@ -162,7 +167,7 @@ void Radio::queryRadioInfo(Transports::Response::GetInfo &outInfo) {
  */
 void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
     this->transport->sendCommandWithResponse(Transports::CommandId::GetStatus,
-            {reinterpret_cast<uint8_t *>(&outStatus), sizeof(outStatus)});
+            {reinterpret_cast<std::byte *>(&outStatus), sizeof(outStatus)});
 }
 
 /**
@@ -172,7 +177,7 @@ void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
  */
 void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &outStatus) {
     this->transport->sendCommandWithResponse(Transports::CommandId::GetPacketQueueStatus,
-            {reinterpret_cast<uint8_t *>(&outStatus), sizeof(outStatus)});
+            {reinterpret_cast<std::byte *>(&outStatus), sizeof(outStatus)});
 }
 
 /**
@@ -182,7 +187,7 @@ void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &o
  * separated out into the two components.
  */
 void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
-        std::span<uint8_t> payloadBuf) {
+        std::span<std::byte> payloadBuf) {
     // prepare our receive buffer, then do request
     this->rxBuffer.resize(sizeof(outHeader) + payloadBuf.size());
     this->transport->sendCommandWithResponse(Transports::CommandId::ReadPacket, this->rxBuffer);
