@@ -30,7 +30,8 @@ struct GetPacketQueueStatus {
             temp.rxPacketSize = rxPending->packetSize;
         }
 
-        // TODO: transmit queue state
+        // transmit queue state
+        temp.txPacketPending = !Packet::Handler::GetTxEmptyFlag();
 
         // copy out the correct amount
         const auto actualNum = etl::min(requested, sizeof(temp));

@@ -13,6 +13,11 @@ namespace HostIf::Handlers {
  * Takes the received packet, and inserts it into the radio's transmit queue.
  */
 struct TransmitPacket {
+    /**
+     * @brief Handle a write from the host
+     *
+     * Copy the received packet into the radio transmit queue.
+     */
     static int DoWrite(const uint8_t, etl::span<const uint8_t> payload) {
         using PacketPriority = Packet::Handler::TxPacketPriority;
 

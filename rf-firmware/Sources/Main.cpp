@@ -83,38 +83,7 @@ extern "C" int main(int argc, void **argv) {
     HwInit();
     SwInit();
 
-    // create test thymer
-    static TimerHandle_t fuckHandle;
-    static StaticTimer_t fuckStorage;
 
-    fuckHandle = xTimerCreateStatic("cum", pdMS_TO_TICKS(200), pdTRUE, nullptr,
-            [](auto timerId) {
-        static unsigned int cum{0};
-/*
-        if(cum & (1 << 0)) {
-            GPIO_PinOutSet(LED_nRX_PORT, LED_nRX_PIN);
-        } else {
-            GPIO_PinOutClear(LED_nRX_PORT, LED_nRX_PIN);
-        }
-
-        if(cum & (1 << 1)) {
-            GPIO_PinOutSet(LED_nTX_PORT, LED_nTX_PIN);
-        } else {
-            GPIO_PinOutClear(LED_nTX_PORT, LED_nTX_PIN);
-        }
-
-        if(cum & (1 << 2)) {
-            GPIO_PinOutSet(LED_nATTN_PORT, LED_nATTN_PIN);
-        } else {
-            GPIO_PinOutClear(LED_nATTN_PORT, LED_nATTN_PIN);
-        }
-
-        cum++;
-
-        // delay loop
-        volatile unsigned int fuck{1420690};
-        while(fuck--) {}
-    }
     // start scheduler
     Rtos::StartScheduler();
 }

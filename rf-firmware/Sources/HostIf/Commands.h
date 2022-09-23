@@ -118,6 +118,52 @@ struct GetStatus {
 } __attribute__((packed));
 
 /**
+ * @brief "Irq configuration" command response
+ *
+ * Indicates the state of which interrupts are masked (0) or allowed (1) to generate a physical
+ * interrupt.
+ */
+struct IrqConfig {
+    /**
+     * @brief Command error interrupt
+     *
+     * Set: Asserted any time a radio command fails.
+     *
+     * Clear: Read status register
+     */
+    uint8_t commandError                        :1;
+
+    /**
+     * @brief Receive queue not empty
+     *
+     * Set: A packet was received and is waiting in the receive queue
+     *
+     * Clear: Read out all pending packets
+     */
+    uint8_t rxQueueNotEmpty                     :1;
+
+    /**
+     * @brief Packet transmitted
+     *
+     * Set: A packet was successfully transmitted
+     *
+     * Clear: Read status register
+     */
+    uint8_t txPacket                            :1;
+
+    /**
+     * @brief Transmit queue empty
+     *
+     * Set: The last pending packet has been transmitted
+     *
+     * Clear: Read status register
+     */
+    uint8_t txQueueEmpty                        :1;
+
+    uint8_t reserved                            :4;
+} __attribute__((packed));
+
+/**
  * @brief "Get packet queue status" command response
  *
  * Indicates the state of the receive and transmit queues.
@@ -196,6 +242,13 @@ struct TransmitPacket {
     /// Packet payload data (including MAC headers)
     uint8_t data[];
 } __attribute__((packed));
+
+/**
+ * @brief "IrqConfig" command
+ *
+ * This is the same format as the read out command.
+ */
+using IrqConfig = Response::IrqConfig;
 };
 }
 

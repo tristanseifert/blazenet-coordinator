@@ -86,6 +86,22 @@ class IrqManager {
         }
 
         /**
+         * @brief Get current interrupt mask
+         */
+        static inline auto GetMask() {
+            return gMask;
+        }
+
+        /**
+         * @brief Get pending interrupts
+         *
+         * Returns all pending interrupts that aren't masked.
+         */
+        static inline auto GetPending() {
+            return gMaskedActive;
+        }
+
+        /**
          * @brief Assert (set) an interrupt line
          *
          * Marks the specified interrupt lines as being asserted, and updates the physical
