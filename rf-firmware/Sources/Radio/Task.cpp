@@ -2,6 +2,7 @@
 
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
+#include "Packet/Handler.h"
 #include "Rtos/Rtos.h"
 
 #include "Task.h"
@@ -34,20 +35,38 @@ void Task::Init(RAIL_Handle_t rail) {
 }
 
 /**
+ * @brief Configure the automatic acknowledgement
+ *
+ * Sets up the automatic acknowledgement feature of the radio stack.
+ */
+void Task::InitAutoAck() {
+    RAIL_AutoAckConfig_t autoAckConfig = {
+        .enable = true,
+        // wait up to 1ms for ack
+        .ackTimeout = 1000,
+        // "error" param ignored
+        .rxTransitions = { RAIL_RF_STATE_RX, RAIL_RF_STATE_RX},
+        // "error" param ignored
+        .txTransitions = { RAIL_RF_STATE_RX, RAIL_RF_STATE_RX}
+    };
+    RAIL_Status_t err = RAIL_ConfigAutoAck(gRail, &autoAckConfig);
+
+    REQUIRE(err == RAIL_STATUS_NO_ERROR, "%s failed: %d", "RAIL_ConfigAutoAck", err);
+}
+
+
+
+/**
  * @brief Task main loop
  */
 void Task::Main() {
     BaseType_t ok;
-    RAIL_Status_t err;
 
     // perform deferred setup
     Logger::Trace("%s: init", "Radio");
 
     RAIL_ResetFifo(gRail, true, true);
-
-    // XXX: begin reception
-    err = RAIL_StartRx(gRail, 6, nullptr);
-    REQUIRE(!err, "%s failed: %d", "RAIL_StartRx", err);
+    InitAutoAck();
 
     // wait for event
     while(true) {
@@ -91,8 +110,69 @@ void Task::ReadPacket() {
     // TODO: do this
     gRxFrames++;
 
+/*
+    // generate acknowledgement
+    static etl::array<uint8_t, 6> gAckBuffer;
+    //etl::copy(, , gAckBuffer.begin());
+
+    err = RAIL_WriteAutoAckFifo(gRail, gAckBuffer.data(), gAckBuffer.size());
+    REQUIRE(err == RAIL_STATUS_NO_ERROR, "%s failed: %d", "RAIL_WriteAutoAckFifo");
+*/
+
     // clean up
     RAIL_ReleaseRxPacket(gRail, phandle);
+}
+
+
+
+/**
+ * @brief Set the radio channel currently in use
+ *
+ * The effect of the change is immediate. Any pending data in the radio's receive and transmit
+ * FIFOs will be lost, but packets that have already been downloaded into the packet handler are
+ * unaffected. Similarly, any subsequently transmitted packets (such as ones still pending in
+ * the packet handler's queues) will be sent on this new channel.
+ *
+ * @param newChannel New channel number to activate
+ *
+ * @return 0 on success
+ */
+int Task::SetChannel(const uint16_t newChannel) {
+    RAIL_Status_t err;
+
+    // validate channel number
+    if(RAIL_IsValidChannel(gRail, newChannel) != RAIL_STATUS_NO_ERROR) {
+        Logger::Warning("invalid channel %u", newChannel);
+        return -2;
+    }
+
+    // reset FIFOs
+    RAIL_ResetFifo(gRail, true, true);
+
+    // start reception
+    err = RAIL_StartRx(gRail, 6, nullptr);
+
+    if(err != RAIL_STATUS_NO_ERROR) {
+        Logger::Warning("%s failed: %d", "RAIL_StartRx", err);
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Read the currently active channel
+ *
+ * @return Current channel, or 0xFFFF if not configured/available
+ */
+uint16_t Task::GetChannel() {
+    uint16_t temp;
+    auto status = RAIL_GetChannel(gRail, &temp);
+    if(status == RAIL_STATUS_NO_ERROR) {
+        return temp;
+    }
+
+    return ~0;
 }
 
 

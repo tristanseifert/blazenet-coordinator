@@ -53,7 +53,12 @@ class Task {
     public:
         static void Init(RAIL_Handle_t rail);
 
+        static int SetChannel(const uint16_t newChannel);
+        static uint16_t GetChannel();
+
     private:
+        static void InitAutoAck();
+
         static void Main();
 
         static void ReadPacket();

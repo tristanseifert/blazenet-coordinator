@@ -55,6 +55,8 @@ struct GetInfo {
 
     /// Firmware version information
     struct {
+        /// Protocol version (current is 1)
+        uint8_t protocolVersion;
         /// Major version
         uint8_t major;
         /// Minor version
@@ -82,6 +84,30 @@ struct GetInfo {
         /// Maximum transmit power (in 1/10th dBm)
         uint8_t maxTxPower;
     } radio;
+} __attribute__((packed));
+};
+
+
+/**
+ * @brief Packet formats for requests sent by the host to the controller
+ */
+namespace Request {
+/**
+ * @brief "RadioConfig" command request
+ *
+ * This command is used to configure the radio PHY on the device for proper operation.
+ */
+struct RadioConfig {
+    /// Channel number to use
+    uint16_t channel;
+    /**
+     * @brief Maximum transmit power (in ⅒th of dBm) for any outgoing packets
+     *
+     * This is the power level used for multicast and broadcast frames, as well as network
+     * management frames such as beacons. Unicast communications may use a (continuously adjusted)
+     * lower transmit power.
+     */
+    uint16_t txPower;
 } __attribute__((packed));
 };
 }

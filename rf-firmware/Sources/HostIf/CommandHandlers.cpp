@@ -9,6 +9,7 @@
 #define HOSTIF_COMMANDHANDLER_H
 
 #include "Handlers/GetInfo.h"
+#include "Handlers/RadioConfig.h"
 
 #include "Task.h"
 
@@ -55,10 +56,7 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
             memcpy(buffer.data(), kData.data(), numBytesRequested);
             return numBytesRequested;
         },
-        .write  = [](auto, auto payload) -> int {
-            // TODO: implement
-            return 0;
-        },
+        .write  = Handlers::RadioConfig::DoWrite,
     }
 }};
 

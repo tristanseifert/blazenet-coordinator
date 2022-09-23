@@ -27,6 +27,7 @@ struct GetInfo {
         info->status = 1;
 
         // software version
+        info->fw.protocolVersion = 0x01;
         info->fw.major = 0x00;
         info->fw.minor = 0x01;
         strncpy(info->fw.build, gBuildInfo.gitHash, sizeof(info->fw.build));
