@@ -8,13 +8,17 @@
 #include <etl/span.h>
 #include <etl/string_view.h>
 
-#include "gecko-config/pin_config.h"
-#include "em_gpio.h"
-
 #include "bitflags.h"
 #include "Rtos/Rtos.h"
 
 namespace HostIf {
+namespace Response {
+struct GetStatus;
+}
+namespace Handlers {
+struct GetStatus;
+}
+
 /**
  * @brief Flags for command handlers
  *
@@ -36,6 +40,8 @@ ENUM_FLAGS_EX(HandlerFlags, uintptr_t);
  * to the host. It also controls the host interrupt line.
  */
 class Task {
+    friend struct Handlers::GetStatus;
+
     private:
         /// Runtime priority level
         static const constexpr uint8_t kPriority{Rtos::TaskPriority::Middleware};
@@ -49,7 +55,7 @@ class Task {
         /// Maximum payload size (bytes)
         static const constexpr size_t kMaxPayloadSize{256};
         /// Maximum supported command id (TODO: keep in sync with CommandId enum)
-        static const constexpr size_t kMaxCommandId{0x03};
+        static const constexpr size_t kMaxCommandId{0x08};
 
         /**
          * @brief Command handler
@@ -114,19 +120,6 @@ class Task {
         static void ReadCommand();
         static void ReadPayload(const size_t);
 
-        /**
-         * @brief Set the status of the host-facing IRQ line
-         *
-         * @param isAsserted Whether the interrupt is asserted (active low)
-         */
-        inline static void SetIrqStatus(const bool isAsserted) {
-            if(isAsserted) {
-                GPIO_PinOutClear(HOST_nIRQ_PORT, HOST_nIRQ_PIN);
-            } else {
-                GPIO_PinOutSet(HOST_nIRQ_PORT, HOST_nIRQ_PIN);
-            }
-        }
-
     private:
         /// Global command handlers
         static const etl::array<const CommandHandler, kMaxCommandId> gHandlers;
@@ -142,6 +135,9 @@ class Task {
         static size_t gPayloadBytesReceived;
         /// Buffer for command payload (shared between rx and tx)
         static etl::array<uint8_t, kMaxPayloadSize> gPayloadBuffer;
+
+        /// Error flag (set if the last command returned an error; cleared on status read)
+        static bool gErrorFlag;
 };
 }
 

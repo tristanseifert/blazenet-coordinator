@@ -12,6 +12,11 @@ enum class CommandId: uint8_t {
     NoOp                                        = 0x00,
     GetInfo                                     = 0x01,
     RadioConfig                                 = 0x02,
+    GetStatus                                   = 0x03,
+    IrqConfig                                   = 0x04,
+    GetPacketQueueStatus                        = 0x05,
+    ReadPacket                                  = 0x06,
+    TransmitPacket                              = 0x07,
 
     /// Total number of defined commands
     NumCommands,
@@ -84,6 +89,32 @@ struct GetInfo {
         /// Maximum transmit power (in 1/10th dBm)
         uint8_t maxTxPower;
     } radio;
+} __attribute__((packed));
+
+/**
+ * @brief "Get Status" command response
+ *
+ * This is basically one gigantic bitfield of event flags.
+ */
+struct GetStatus {
+    /// Last command resulted in error
+    uint8_t errorFlag                           :1;
+    /// Radio is active (tuned to channel and receiving or transmitting)
+    uint8_t radioActive                         :1;
+
+    /// At least one packet is pending in the receive queue
+    uint8_t rxQueueNotEmpty                     :1;
+    /// The receive queue is full
+    uint8_t rxQueueFull                         :1;
+    /// Receive queue overflow (packets have been discarded)
+    uint8_t rxQueueOverflow                     :1;
+
+    /// Transmit queue is empty
+    uint8_t txQueueEmpty                        :1;
+    /// Transmit queue is full
+    uint8_t txQueueFull                         :1;
+    /// Transmit queue overflow (packets have been discarded)
+    uint8_t txQueueOverflow                     :1;
 } __attribute__((packed));
 };
 

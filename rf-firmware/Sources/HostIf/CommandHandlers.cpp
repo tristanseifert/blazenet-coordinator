@@ -10,6 +10,7 @@
 
 #include "Handlers/GetInfo.h"
 #include "Handlers/RadioConfig.h"
+#include "Handlers/GetStatus.h"
 
 #include "Task.h"
 
@@ -57,7 +58,13 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
             return numBytesRequested;
         },
         .write  = Handlers::RadioConfig::DoWrite,
-    }
+    },
+    // 0x03: GetStatus
+    {
+        .flags  = HandlerFlags::SupportsRead,
+        .read   = Handlers::GetStatus::DoRead,
+        .write  = nullptr,
+    },
 }};
 
 #endif

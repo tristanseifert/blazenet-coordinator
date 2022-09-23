@@ -175,6 +175,17 @@ uint16_t Task::GetChannel() {
     return ~0;
 }
 
+/**
+ * @brief Check if the radio is active
+ *
+ * The radio is considered active if it's tuned to a channel, and either in transmit or receive
+ * mode.
+ */
+bool Task::IsActive() {
+    auto state = RAIL_GetRadioState(gRail);
+    return (state & RAIL_RF_STATE_RX) | (state & RAIL_RF_STATE_TX);
+}
+
 
 
 /**

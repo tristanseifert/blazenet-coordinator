@@ -56,6 +56,8 @@ class Task {
         static int SetChannel(const uint16_t newChannel);
         static uint16_t GetChannel();
 
+        static bool IsActive();
+
     private:
         static void InitAutoAck();
 
@@ -69,7 +71,7 @@ class Task {
         /// Radio interface handle (used for all later interfaces)
         static RAIL_Handle_t gRail;
 
-        /// Performance counter to track the number of receive overflows
+        /// Performance counter to track the number of receive FIFO overflows
         static size_t gRxFifoOverflows;
         /// Number of frames received with errors (invalid CRC, etc.)
         static size_t gRxFrameErrors;

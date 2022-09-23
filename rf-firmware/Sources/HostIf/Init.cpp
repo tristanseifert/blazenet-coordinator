@@ -5,6 +5,7 @@
 #include "Log/Logger.h"
 
 #include "Task.h"
+#include "IrqManager.h"
 #include "Init.h"
 
 using namespace HostIf;
@@ -15,9 +16,7 @@ using namespace HostIf;
  * This will set up the hardware (GPIOs) and then starts the SPI processing task.
  */
 void HostIf::Init() {
-    // set up GPIOs (open drain, w/ pull-up)
-    GPIO_PinModeSet(HOST_nIRQ_PORT, HOST_nIRQ_PIN, gpioModeWiredAndPullUp, true);
+    IrqManager::Init();
 
-    // start the task
     Task::Init();
 }

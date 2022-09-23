@@ -6,6 +6,7 @@
 #include "Rtos/Rtos.h"
 
 #include "Commands.h"
+#include "IrqManager.h"
 #include "Task.h"
 
 using namespace HostIf;
@@ -16,6 +17,8 @@ bool Task::gCommandBufferValid{false};
 CommandHeader Task::gCommandBuffer;
 size_t Task::gPayloadBytesReceived{0};
 etl::array<uint8_t, Task::kMaxPayloadSize> Task::gPayloadBuffer;
+
+bool Task::gErrorFlag{false};
 
 /**
  * @brief Initialize the host interface task
@@ -143,6 +146,8 @@ void Task::DispatchCommand(const uint8_t cmd, etl::span<uint8_t> payload) {
     err = handler.write(cmd, payload);
     if(err) {
         Logger::Warning("Cmd %02x failed: %d", cmd, "write", err);
+        gErrorFlag = true;
+        IrqManager::Assert(Interrupt::CommandError);
     }
 }
 
@@ -175,6 +180,8 @@ void Task::DispatchCommandWithResponse(const uint8_t cmd, const size_t numRespon
     ret = handler.read(cmd, numResponseBytes, gPayloadBuffer);
     if(ret < 0) {
         Logger::Warning("Cmd %02x failed: %d", cmd, "read", ret);
+        gErrorFlag = true;
+        IrqManager::Assert(Interrupt::CommandError);
         return;
     }
     REQUIRE(ret < gPayloadBuffer.size(), "invalid reply length: %d", ret);
