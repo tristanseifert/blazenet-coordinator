@@ -106,7 +106,7 @@ void Radio::irqHandler() {
         // read a packet
         if(status.rxQueueNotEmpty) {
             this->readPacket();
-        //    checkAgain = true;
+            checkAgain = true;
         }
         if(status.rxQueueOverflow) {
             // TODO: reset overflow flag
@@ -123,6 +123,8 @@ void Radio::irqHandler() {
  */
 void Radio::readPacket() {
     Transports::Response::GetPacketQueueStatus status;
+    Transports::Response::ReadPacket packet;
+    std::vector<uint8_t> packetData;
 
     // read packet queue status
     this->queryPacketQueueStatus(status);
@@ -131,6 +133,10 @@ void Radio::readPacket() {
     }
 
     PLOG_VERBOSE << fmt::format("rx packet pending: {} bytes", status.rxPacketSize);
+
+    // allocate packet buffer and read
+    packetData.resize(status.rxPacketSize);
+    this->readPacket(packet, packetData);
 }
 
 
@@ -167,4 +173,26 @@ void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
 void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &outStatus) {
     this->transport->sendCommandWithResponse(Transports::CommandId::GetPacketQueueStatus,
             {reinterpret_cast<uint8_t *>(&outStatus), sizeof(outStatus)});
+}
+
+/**
+ * @brief Receive a packet from the radio
+ *
+ * The entire packet (plus header) is received into a temporary buffer, from which it's then
+ * separated out into the two components.
+ */
+void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
+        std::span<uint8_t> payloadBuf) {
+    // prepare our receive buffer, then do request
+    this->rxBuffer.resize(sizeof(outHeader) + payloadBuf.size());
+    this->transport->sendCommandWithResponse(Transports::CommandId::ReadPacket, this->rxBuffer);
+
+    // TODO: check for success
+
+    // copy out data
+    auto header = reinterpret_cast<const Transports::Response::ReadPacket*>(this->rxBuffer.data());
+    outHeader = *header;
+
+    std::copy(this->rxBuffer.begin() + offsetof(Transports::Response::ReadPacket, payload),
+            this->rxBuffer.end(), payloadBuf.begin());
 }

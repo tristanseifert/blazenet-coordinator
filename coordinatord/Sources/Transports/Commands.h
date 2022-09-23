@@ -70,6 +70,15 @@ enum class CommandId: uint8_t {
      * Reads are supported.
      */
     GetPacketQueueStatus                        = 0x05,
+
+    /**
+     * @brief Read packet
+     *
+     * Read the oldest packet out of the receive queue.
+     *
+     * Reads are supported.
+     */
+    ReadPacket                                  = 0x06,
 };
 
 /**
@@ -174,6 +183,24 @@ struct GetPacketQueueStatus {
 
     /// Size of the next packet to be read from the receive queue
     uint8_t rxPacketSize;
+} __attribute__((packed));
+
+/**
+ * @brief "ReadPacket" command response
+ *
+ * Returns the contents of a buffer slot in the receive queue.
+ *
+ * @remark This does _not_ contain the packet payload length, as it's expected that you previously
+ * retrieved this with a call to GetPacketQueueStatus.
+ */
+struct ReadPacket {
+    /// Packet RSSI (in dB)
+    int8_t rssi;
+    /// Link quality (relative scale, where 0 is worst and 255 is best)
+    uint8_t lqi;
+
+    /// Actual payload data
+    uint8_t payload[];
 } __attribute__((packed));
 }
 
