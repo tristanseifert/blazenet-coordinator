@@ -60,6 +60,16 @@ enum class CommandId: uint8_t {
      * Reads are supported.
      */
     GetStatus                                   = 0x03,
+
+    /**
+     * @brief Get packet queue status
+     *
+     * Read out the current status of the internal packet queues, both the transmit and receive
+     * queues.
+     *
+     * Reads are supported.
+     */
+    GetPacketQueueStatus                        = 0x05,
 };
 
 /**
@@ -148,6 +158,22 @@ struct GetStatus {
     uint8_t txQueueFull                         :1;
     /// Transmit queue overflow (packets have been discarded)
     uint8_t txQueueOverflow                     :1;
+} __attribute__((packed));
+
+/**
+ * @brief "Get packet queue status" command response
+ *
+ * Indicates the state of the receive and transmit queues.
+ */
+struct GetPacketQueueStatus {
+    /// Is at least one receive packet pending?
+    uint8_t rxPacketPending                     :1;
+    /// Is there a transmit packet pending?
+    uint8_t txPacketPending                     :1;
+    uint8_t reserved                            :6;
+
+    /// Size of the next packet to be read from the receive queue
+    uint8_t rxPacketSize;
 } __attribute__((packed));
 }
 

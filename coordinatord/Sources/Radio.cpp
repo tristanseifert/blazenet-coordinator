@@ -15,6 +15,10 @@
  * configuration.
  */
 Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : transport(_transport) {
+    this->transport->addIrqHandler([&](){
+        this->irqHandler();
+    });
+
     /*
      * Read out general information about the radio, to ensure that we can successfully
      * communicate with it, and store it for later.
@@ -83,6 +87,55 @@ void Radio::uploadConfig() {
 
 
 /**
+ * @brief Interrupt handler
+ *
+ * This is invoked by the underlying transport when it detects that the controller has asserted its
+ * interrupt line.
+ */
+void Radio::irqHandler() {
+    bool checkAgain;
+    Transports::Response::GetStatus status;
+
+    // read status until we've serviced everything that needs servicing
+    do {
+        this->queryStatus(status);
+        checkAgain = false;
+
+        PLOG_INFO << fmt::format("status register: 0b{:08b}", *((uint8_t *) &status));
+
+        // read a packet
+        if(status.rxQueueNotEmpty) {
+            this->readPacket();
+        //    checkAgain = true;
+        }
+        if(status.rxQueueOverflow) {
+            // TODO: reset overflow flag
+            // checkAgain = true;
+        }
+    } while(checkAgain);
+}
+
+/**
+ * @brief Read a pending packet.
+ *
+ * Check the packet queue status, and read out a packet from the queue. The packet is then
+ * submitted to the upper layer packet handler.
+ */
+void Radio::readPacket() {
+    Transports::Response::GetPacketQueueStatus status;
+
+    // read packet queue status
+    this->queryPacketQueueStatus(status);
+    if(!status.rxPacketPending) {
+        throw std::runtime_error("no rx packet pending!");
+    }
+
+    PLOG_VERBOSE << fmt::format("rx packet pending: {} bytes", status.rxPacketSize);
+}
+
+
+
+/**
  * @brief Execute the "get info" command
  *
  * @param outInfo Information structure to fill
@@ -103,5 +156,15 @@ void Radio::queryRadioInfo(Transports::Response::GetInfo &outInfo) {
  */
 void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
     this->transport->sendCommandWithResponse(Transports::CommandId::GetStatus,
+            {reinterpret_cast<uint8_t *>(&outStatus), sizeof(outStatus)});
+}
+
+/**
+ * @brief Execute the "get packet queue status" command
+ *
+ * @param outStatus Packet queue status structure to fill
+ */
+void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &outStatus) {
+    this->transport->sendCommandWithResponse(Transports::CommandId::GetPacketQueueStatus,
             {reinterpret_cast<uint8_t *>(&outStatus), sizeof(outStatus)});
 }

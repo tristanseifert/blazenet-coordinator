@@ -11,6 +11,7 @@ class TransportBase;
 namespace Response {
 struct GetInfo;
 struct GetStatus;
+struct GetPacketQueueStatus;
 }
 }
 
@@ -57,8 +58,12 @@ class Radio {
         void uploadConfig();
 
     private:
+        void irqHandler();
+        void readPacket();
+
         void queryRadioInfo(Transports::Response::GetInfo &);
         void queryStatus(Transports::Response::GetStatus &);
+        void queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &);
 
     private:
         /// Interface used to communicate with the radio

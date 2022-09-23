@@ -327,8 +327,11 @@ void Spidev::handleIrq(int fd, size_t flags) {
     }
 
     // process the event
-    // TODO: implement
-    PLOG_INFO << "Event type: " << info.event_type;
+    PLOG_DEBUG << "Event type: " << info.event_type;
+
+    if(info.event_type == GPIOD_LINE_EVENT_FALLING_EDGE) {
+        this->invokeIrqHandlers();
+    }
 }
 
 

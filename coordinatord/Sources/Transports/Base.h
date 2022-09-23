@@ -3,7 +3,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <span>
+#include <vector>
 #include <toml++/toml.h>
 
 #include "Commands.h"
@@ -47,6 +49,29 @@ class TransportBase {
          */
         virtual void sendCommandWithPayload(const CommandId command,
                 std::span<const uint8_t> payload) = 0;
+
+        /**
+         * @brief Register an interrupt handler
+         *
+         * @param handler Function to invoke when an interrupt is detected
+         */
+        virtual void addIrqHandler(const std::function<void()> &handler) {
+            irqHandlers.emplace_back(handler);
+        }
+
+    protected:
+        /**
+         * @brief Invoke all registered interrupt handlers
+         */
+        virtual void invokeIrqHandlers() {
+            for(const auto &handler : this->irqHandlers) {
+                handler();
+            }
+        }
+
+    protected:
+        /// Registered interrupt handlers
+        std::vector<std::function<void()>> irqHandlers;
 };
 }
 
