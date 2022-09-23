@@ -12,9 +12,11 @@ using namespace Radio;
 TaskHandle_t Task::gTask;
 RAIL_Handle_t Task::gRail;
 
-size_t Task::gRxFifoOverflows{0};
-size_t Task::gRxFrameErrors{0};
-size_t Task::gRxFrames{0};
+size_t Task::gRxFifoOverflows{0}, Task::gRxFrameErrors{0}, Task::gRxFrames{0};
+
+uint16_t Task::gTxChannel{UINT16_MAX};
+size_t Task::gTxFifoDrops{0}, Task::gTxCcaFails{0}, Task::gTxFrames{0};
+Packet::Handler::TxPacketBuffer *Task::gLastTx{nullptr};
 
 /**
  * @brief Initialize the radio task
@@ -76,12 +78,23 @@ void Task::Main() {
                 portMAX_DELAY);
         REQUIRE(ok == pdTRUE, "%s failed: %d", "xTaskNotifyWaitIndexed", ok);
 
-        // invoke the appropriate handlers
+        // copy out a received packet
         if(note & NotifyBits::PacketReceived) {
             Hw::Indicators::PulseRx();
 
             // TODO: loop for all complete packets in FIFO
             ReadPacket();
+        }
+        // packet just finished transmitting
+        if(note & NotifyBits::PacketTransmitted) {
+            Hw::Indicators::PulseTx();
+
+            HandleTxComplete();
+        }
+        // failed to transmit packet: channel busy
+        if(note & NotifyBits::TxChannelBusy) {
+            // TODO: implement this
+            Logger::Panic("can't tx %p: channel busy", gLastTx);
         }
     }
 }
@@ -104,7 +117,10 @@ void Task::ReadPacket() {
     }
 
     RAIL_GetRxPacketDetails(gRail, phandle, &details);
-    Logger::Notice("Rx(%u) rssi: %d", info.packetBytes, details.rssi);
+
+    if(kLogRx) {
+        Logger::Notice("Rx(%u) rssi: %d", info.packetBytes, details.rssi);
+    }
 
     // enqueue the packet (it will be copied)
     Packet::Handler::EnqueueRxPacket(info, details);
@@ -121,6 +137,74 @@ void Task::ReadPacket() {
 
     // clean up
     RAIL_ReleaseRxPacket(gRail, phandle);
+}
+
+/**
+ * @brief Begin transmission of the specified packet
+ *
+ * The packet's data is copied into the transmit FIFO, so the packet buffer may be released after
+ * this call returns.
+ *
+ * @param packet Packet buffer to transmit
+ *
+ * @return 0 on success or a negative error code
+ */
+int Task::TxPacketImmediate(Packet::Handler::TxPacketBuffer *packet) {
+    RAIL_Status_t err;
+
+    taskENTER_CRITICAL();
+    // write data into TX FIFO
+    auto written = RAIL_WriteTxFifo(gRail, packet->data, packet->packetSize, true);
+    if(written != packet->packetSize) {
+        // TODO: log TX FIFO overflow
+        gTxFifoDrops++;
+        return -1;
+    }
+
+    // begin transmit
+    // TODO: use CSMA
+    err = RAIL_StartTx(gRail, gTxChannel, 0, nullptr);
+    if(err != RAIL_STATUS_NO_ERROR) {
+        return -2;
+    }
+
+    // packet was queued for transmission :)
+    gLastTx = packet;
+    taskEXIT_CRITICAL();
+
+    if(kLogTx) {
+        Logger::Notice("start tx %p", packet);
+    }
+
+    return 0;
+}
+
+/**
+ * @brief The last packet was successfully transmitted
+ *
+ * Release the packet buffer associated with the packet, and set up for transmitting the next
+ * packet, if any.
+ */
+void Task::HandleTxComplete() {
+    int err;
+
+    // TODO: anything else?
+
+    // discard the buffer
+    Packet::Handler::DiscardTxPacket(gLastTx);
+    gLastTx = nullptr;
+
+    auto empty = Packet::Handler::GetTxEmptyFlag();
+
+    // check if there's any other packets: if so, transmit one
+    // XXX: is this potentially racy?
+    if(!empty) {
+        auto next = Packet::Handler::PopTxQueue();
+        REQUIRE(next, "failed to pop tx packet (but queue isn't empty?)");
+
+        err = TxPacketImmediate(next);
+        REQUIRE(!err, "%s failed: %d", "TxPacketImmediate", err);
+    }
 }
 
 
@@ -150,13 +234,14 @@ int Task::SetChannel(const uint16_t newChannel) {
     RAIL_ResetFifo(gRail, true, true);
 
     // start reception
-    err = RAIL_StartRx(gRail, 6, nullptr);
+    err = RAIL_StartRx(gRail, newChannel, nullptr);
 
     if(err != RAIL_STATUS_NO_ERROR) {
         Logger::Warning("%s failed: %d", "RAIL_StartRx", err);
         return -1;
     }
 
+    gTxChannel = newChannel;
     return 0;
 }
 
@@ -241,6 +326,18 @@ extern "C" void sl_rail_util_on_event(RAIL_Handle_t handle, RAIL_Events_t events
         RAIL_HoldRxPacket(handle);
         xTaskNotifyIndexedFromISR(Task::gTask, Task::kNotificationIndex,
                 Task::NotifyBits::PacketReceived, eSetBits, &woken);
+    }
+    // packet transmitted
+    if(events & RAIL_EVENT_TX_PACKET_SENT) {
+        Task::gTxFrames++;
+        xTaskNotifyIndexedFromISR(Task::gTask, Task::kNotificationIndex,
+                Task::NotifyBits::PacketTransmitted, eSetBits, &woken);
+    }
+    // packet failed to transmit (channel busy)
+    if(events & RAIL_EVENT_TX_CHANNEL_BUSY) {
+        Task::gTxCcaFails++;
+        xTaskNotifyIndexedFromISR(Task::gTask, Task::kNotificationIndex,
+                Task::NotifyBits::TxChannelBusy, eSetBits, &woken);
     }
     // RX frame error: CRC, block decode, and illegal frame length
     if(events & RAIL_EVENT_RX_FRAME_ERROR) {

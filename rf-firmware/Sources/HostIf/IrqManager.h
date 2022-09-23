@@ -33,6 +33,28 @@ enum class Interrupt: uintptr_t {
      * Clear: Read out all pending packets
      */
     PacketReceived                              = (1 << 1),
+
+    /**
+     * @brief Packet transmitted
+     *
+     * Set: A packet was transmitted
+     *
+     * Clear: Read status register
+     */
+    PacketTransmitted                           = (1 << 2),
+
+    /**
+     * @brief Transmit queue is empty
+     *
+     * Set: All pending packets are transmitted
+     *
+     * Clear: Read out status register
+     */
+    TxQueueEmpty                                = (1 << 3),
+
+    /// Mask of interrupts cleared when the status register is read
+    StatusReadCleared                           = (CommandError | PacketTransmitted |
+            TxQueueEmpty),
 };
 ENUM_FLAGS_EX(Interrupt, uintptr_t);
 
@@ -97,6 +119,8 @@ class IrqManager {
         static Interrupt gActive;
         /// Current interrupt mask
         static Interrupt gMask;
+        /// Masked, active interrupts
+        static Interrupt gMaskedActive;
 };
 }
 

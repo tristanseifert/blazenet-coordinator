@@ -13,6 +13,7 @@
 #include "Handlers/GetStatus.h"
 #include "Handlers/GetPacketQueueStatus.h"
 #include "Handlers/ReadPacket.h"
+#include "Handlers/TransmitPacket.h"
 
 #include "Task.h"
 
@@ -82,6 +83,12 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
         .flags  = HandlerFlags::SupportsRead,
         .read   = Handlers::ReadPacket::DoRead,
         .write  = nullptr,
+    },
+    // 0x07: TransmitPacket
+    {
+        .flags  = HandlerFlags::SupportsWrite,
+        .read   = nullptr,
+        .write  = Handlers::TransmitPacket::DoWrite,
     },
 }};
 

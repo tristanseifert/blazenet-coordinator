@@ -9,7 +9,8 @@
 
 using namespace HostIf;
 
-Interrupt IrqManager::gActive{Interrupt::None}, IrqManager::gMask{Interrupt::None};
+Interrupt IrqManager::gActive{Interrupt::None}, IrqManager::gMask{Interrupt::None},
+          IrqManager::gMaskedActive{Interrupt::None};
 
 /**
  * @brief Set the status of the host-facing IRQ line
@@ -42,5 +43,9 @@ void IrqManager::Init() {
  */
 void IrqManager::Update() {
     auto result = gActive & gMask;
-    SetIrqStatus(TestFlags(result));
+
+    if(result != gMaskedActive) {
+        SetIrqStatus(TestFlags(result));
+        gMaskedActive = result;
+    }
 }

@@ -145,7 +145,7 @@ void Task::DispatchCommand(const uint8_t cmd, etl::span<uint8_t> payload) {
 
     err = handler.write(cmd, payload);
     if(err) {
-        Logger::Warning("Cmd %02x failed: %d", cmd, "write", err);
+        Logger::Warning("Cmd %02x(%s) failed: %d", cmd, "write", err);
         gErrorFlag = true;
         IrqManager::Assert(Interrupt::CommandError);
     }
@@ -179,7 +179,7 @@ void Task::DispatchCommandWithResponse(const uint8_t cmd, const size_t numRespon
 
     ret = handler.read(cmd, numResponseBytes, gPayloadBuffer);
     if(ret < 0) {
-        Logger::Warning("Cmd %02x failed: %d", cmd, "read", ret);
+        Logger::Warning("Cmd %02x(%s) failed: %d", cmd, "read", ret);
         gErrorFlag = true;
         IrqManager::Assert(Interrupt::CommandError);
         return;
@@ -208,6 +208,11 @@ void Task::DispatchCommandWithResponse(const uint8_t cmd, const size_t numRespon
 void Task::ReadCommand() {
     Ecode_t err;
 
+    taskENTER_CRITICAL();
+
+    // clear state
+    gCommandBufferValid = false;
+
     // read the command header
     err = SPIDRV_SReceive(sl_spidrv_eusart_host_handle, &gCommandBuffer,
             sizeof(gCommandBuffer), [](auto handle, auto status, auto numReceived) {
@@ -222,9 +227,7 @@ void Task::ReadCommand() {
         portYIELD_FROM_ISR(woken);
     }, 0);
     REQUIRE(err == ECODE_EMDRV_SPIDRV_OK, "%s failed: %d", "SPIDRV_SReceive %s", err, "header");
-
-    // clear state
-    gCommandBufferValid = false;
+    taskEXIT_CRITICAL();
 }
 
 /**
@@ -236,6 +239,10 @@ void Task::ReadCommand() {
  */
 void Task::ReadPayload(const size_t numBytes) {
     Ecode_t err;
+
+    taskENTER_CRITICAL();
+    // clear state
+    gPayloadBytesReceived = 0;
 
     // read the payload data
     err = SPIDRV_SReceive(sl_spidrv_eusart_host_handle, gPayloadBuffer.data(),
@@ -255,4 +262,5 @@ void Task::ReadPayload(const size_t numBytes) {
     }, 0);
     REQUIRE(err == ECODE_EMDRV_SPIDRV_OK, "%s failed: %d", "SPIDRV_SReceive %s", err,
             "payload");
+    taskEXIT_CRITICAL();
 }

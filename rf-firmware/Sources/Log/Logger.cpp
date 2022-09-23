@@ -125,9 +125,11 @@ void Logger::Log(const Level level, const bool buffered, const etl::string_view 
         // buffer is always this same size
         bufferSz = kTaskLogBufferSize;
 
-        // acquire UART output
-        // XXX: could be skipped if we're outputting a different buffer right now
-        xSemaphoreTake(gUartCompletion, portMAX_DELAY);
+        if(kEnableUartTty) {
+            // acquire UART output
+            // XXX: could be skipped if we're outputting a different buffer right now
+            xSemaphoreTake(gUartCompletion, portMAX_DELAY);
+        }
     }
 
     bufferStart = buffer;
@@ -155,7 +157,10 @@ void Logger::Log(const Level level, const bool buffered, const etl::string_view 
     buffer += numChars;
 
     // write it to our output devices
-    //taskENTER_CRITICAL();
+    if(hasScheduler) {
+        taskENTER_CRITICAL();
+    }
+
     if(kEnableTraceSwo) {
         TracePutString({bufferStart, bytesWritten});
     }
@@ -179,7 +184,10 @@ void Logger::Log(const Level level, const bool buffered, const etl::string_view 
                     reinterpret_cast<uint8_t *>(const_cast<char *>("\r\n")), 2);
         }
     }
-    //taskEXIT_CRITICAL();
+
+    if(hasScheduler) {
+        taskEXIT_CRITICAL();
+    }
 }
 
 /**

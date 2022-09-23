@@ -29,7 +29,6 @@ struct GetStatus {
         // error flag
         temp.errorFlag = Task::gErrorFlag;
         Task::gErrorFlag = false;
-        IrqManager::Deassert(Interrupt::CommandError);
 
         // radio active
         temp.radioActive = Radio::Task::IsActive();
@@ -39,7 +38,12 @@ struct GetStatus {
         temp.rxQueueFull = Packet::Handler::GetRxFullFlag();
         temp.rxQueueOverflow = Packet::Handler::GetRxOverflowFlag();
 
-        // TODO: transmit queue flags
+        // transmit queue flags
+        temp.txQueueEmpty = Packet::Handler::GetTxEmptyFlag();
+        temp.txQueueOverflow = Packet::Handler::GetTxOverflowFlag();
+
+        // clear interrupt flags
+        IrqManager::Deassert(Interrupt::StatusReadCleared);
 
         // copy out the correct amount
         const auto actualNum = etl::min(requested, sizeof(temp));

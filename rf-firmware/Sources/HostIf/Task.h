@@ -44,7 +44,7 @@ class Task {
 
     private:
         /// Runtime priority level
-        static const constexpr uint8_t kPriority{Rtos::TaskPriority::Middleware};
+        static const constexpr uint8_t kPriority{Rtos::TaskPriority::AppHigh};
         /// Size of the task's stack, in words
         static const constexpr size_t kStackSize{420};
         /// Task name (for display purposes)

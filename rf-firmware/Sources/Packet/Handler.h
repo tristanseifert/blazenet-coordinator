@@ -18,11 +18,19 @@ namespace Packet {
  *
  * It doesn't know anything about the actual contents of the packets: this is handled in another
  * upper protocol layer.
+ *
+ * @note Calls into the handler are not thread safe, unless specified otherwise.
  */
 class Handler {
     private:
         /// Log information about rejected receive packets
-        constexpr static const bool kLogRxRejects{false};
+        constexpr static const bool kLogRxRejects{true};
+        /// Log when a receive packet is queued
+        constexpr static const bool kLogRx{false};
+        /// Log information about rejected transmit packets
+        constexpr static const bool kLogTxRejects{true};
+        /// Log information about transmit queue packets
+        constexpr static const bool kLogTx{true};
 
         /**
          * @brief Maximum packet data size
@@ -41,17 +49,66 @@ class Handler {
         constexpr static const size_t kMaxRxBufferSize{8*1024};
 
         /**
-         * @brief Maximum number of queue slots to reserve
+         * @brief Maximum number of receive queue slots to reserve
          *
          * This is the maximum number of packets that may be queued for reading by the host at a
          * given time.
          */
         constexpr static const size_t kMaxRxQueueSize{64};
 
-    public:
+        /**
+         * @brief Maximum size to reserve for transmit buffers
+         *
+         * Defines the maximum number of bytes to be allocated for use as a transmit packet
+         * buffer. This should be relatively small as the host can easily buffer transmit
+         * packets.
+         */
+        constexpr static const size_t kMaxTxBufferSize{4*1024};
 
         /**
-         * @brief Packet buffer structure
+         * @brief Maximum number of transmit queue slots to reserve
+         *
+         * This is the maximum number of packets that may be pending to be transmitted for any
+         * given priority level.
+         */
+        constexpr static const size_t kMaxTxQueueSize{16};
+
+    public:
+        /**
+         * @brief Packet priority values
+         *
+         * Defines the priority of a transmit packet, in terms of which transmit queue it's
+         * loaded into. Packets in higher priority queues will be transmitted before packets in
+         * lower priority queues.
+         */
+        enum class TxPacketPriority: uint8_t {
+            Background                          = 0x00,
+            Normal                              = 0x01,
+            RealTime                            = 0x02,
+            NetworkControl                      = 0x03,
+        };
+
+        /**
+         * @brief Transmit packet buffer structure
+         *
+         * Stores data for a packet to be transmitted over the air.
+         */
+        struct TxPacketBuffer {
+            /**
+             * @brief Size of the payload, in bytes
+             */
+            uint16_t packetSize;
+
+            /**
+             * @brief Packet payload
+             *
+             * This is the full contents of the packet, including MAC and PHY headers.
+             */
+            uint8_t data[];
+        };
+
+        /**
+         * @brief Receive packet buffer structure
          *
          * Types of this structure are allocated to hold received packets. They contain a small
          * bit of metadata, as well as the actual packet payload.
@@ -91,9 +148,15 @@ class Handler {
     private:
         using RxQueueType = etl::queue<RxPacketBuffer *, kMaxRxQueueSize,
               etl::memory_model::MEMORY_MODEL_SMALL>;
+        using TxQueueType = etl::queue<TxPacketBuffer *, kMaxTxQueueSize,
+              etl::memory_model::MEMORY_MODEL_SMALL>;
 
     public:
         static void Init();
+
+        static TxPacketBuffer *EneuqueTxPacket(const TxPacketPriority priority,
+                etl::span<const uint8_t> payload);
+        static void DiscardTxPacket(TxPacketBuffer *);
 
         static RxPacketBuffer *EnqueueRxPacket(const struct RAIL_RxPacketInfo &,
                 const struct RAIL_RxPacketDetails &);
@@ -115,6 +178,8 @@ class Handler {
          * queue.
          *
          * @remark Be sure to call DiscardRxPacket when done to release the packet's memory.
+         *
+         * @seeAlso DiscardRxPacket
          */
         static inline auto PopRxQueue() {
             RxPacketBuffer *buf = gRxQueue->front();
@@ -143,8 +208,50 @@ class Handler {
             return gRxQueue->full();
         }
 
+        /**
+         * @brief Pop the next packet from the transmit queue
+         *
+         * This searches the queues in descending priority order, e.g. the highest priority queue
+         * will be serviced before lower priority queues.
+         *
+         * @return Packet from queue, or `nullptr` if no packets pending
+         *
+         * @remark Be sure to call DiscardTxPacket when done to release the packet's memory.
+         *
+         * @seeAlso DiscardTxPacket
+         */
+        static inline TxPacketBuffer *PopTxQueue() {
+            for(size_t i = 0; i < 4; i++) {
+                auto queue = gTxQueues[3 - i];
+                if(queue->empty()) {
+                    continue;
+                }
+
+                TxPacketBuffer *buf = queue->front();
+                queue->pop();
+                return buf;
+            }
+
+            // no packets pending
+            return nullptr;
+        }
+
+        /**
+         * @brief Get the transmit queue overflow flag
+         */
+        static inline bool GetTxOverflowFlag() {
+            return gTxOverflowFlag;
+        }
+        /**
+         * @brief Is the receive queue empty?
+         */
+        static inline bool GetTxEmptyFlag() {
+            return !gTxPacketsPending;
+        }
+
     private:
         static void UpdateRxQueueState();
+        static void UpdateTxQueueState();
 
     private:
         /// Rx queue overflow flag (sticky)
@@ -159,6 +266,21 @@ class Handler {
         static size_t gRxQueueDiscarded;
         /// Queue holding pointers to all received packets
         static RxQueueType *gRxQueue;
+
+        /// Tx queue overflow flag (sticky)
+        static bool gTxOverflowFlag;
+        /// Total number of bytes allocated for transmit packet buffers
+        static size_t gTxAllocBytes;
+        /// Number of tx packets discarded because the buffer alloc limit has been reached
+        static size_t gTxBufferDiscarded;
+        /// Number of tx packets discarded because of allocation failures
+        static size_t gTxBufferAllocFailed;
+        /// Number of tx packets discarded because rx queue is full
+        static size_t gTxQueueDiscarded;
+        /// Total number of packets pending (if 0, transmit directly)
+        static size_t gTxPacketsPending;
+        /// Containers for receive queues (in ascending priority order)
+        static etl::array<TxQueueType *, 4> gTxQueues;
 };
 }
 

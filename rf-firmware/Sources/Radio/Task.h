@@ -8,6 +8,7 @@
 
 #include <etl/string_view.h>
 
+#include "Packet/Handler.h"
 #include "Rtos/Rtos.h"
 
 extern "C" {
@@ -27,13 +28,18 @@ class Task {
 
     private:
         /// Runtime priority level
-        static const constexpr uint8_t kPriority{Rtos::TaskPriority::AppHigh};
+        static const constexpr uint8_t kPriority{Rtos::TaskPriority::Middleware};
         /// Size of the task's stack, in words
         static const constexpr size_t kStackSize{420};
         /// Task name (for display purposes)
         static const constexpr etl::string_view kName{"Radio"};
         /// Notification index
         static const constexpr size_t kNotificationIndex{Rtos::TaskNotifyIndex::TaskSpecific};
+
+        /// Should received packets be logged?
+        static const constexpr bool kLogRx{false};
+        /// Should transmit packets be logged?
+        static const constexpr bool kLogTx{false};
 
     private:
         /**
@@ -45,9 +51,14 @@ class Task {
         enum NotifyBits: uintptr_t {
             /// A new packet has been received and is available
             PacketReceived                      = (1 << 0),
+            /// The last packet was transmitted successfully
+            PacketTransmitted                   = (1 << 1),
+            /// Failed to transmit a packet, because the channel is busy (retry later)
+            TxChannelBusy                       = (1 << 2),
 
             /// Bitwise OR of all supported task notification bits
-            All                                 = (PacketReceived),
+            All                                 = (PacketReceived | PacketTransmitted |
+                    TxChannelBusy),
         };
 
     public:
@@ -60,12 +71,15 @@ class Task {
 
         static bool IsActive();
 
+        [[nodiscard]] static int TxPacketImmediate(Packet::Handler::TxPacketBuffer *packet);
+
     private:
         static void InitAutoAck();
 
         static void Main();
 
         static void ReadPacket();
+        static void HandleTxComplete();
 
     private:
         /// FreeRTOS Task handle
@@ -79,6 +93,18 @@ class Task {
         static size_t gRxFrameErrors;
         /// Number of good frames received
         static size_t gRxFrames;
+
+        /// Number of packets that failed to be transmitted because TX FIFO is full
+        static size_t gTxFifoDrops;
+        /// Number of times the channel occupancy check prevented transmission
+        static size_t gTxCcaFails;
+        /// Number of packets transmitted successfully
+        static size_t gTxFrames;
+
+        /// Channel to transmit on
+        static uint16_t gTxChannel;
+        /// Last frame transmitted
+        static Packet::Handler::TxPacketBuffer *gLastTx;
 };
 }
 
