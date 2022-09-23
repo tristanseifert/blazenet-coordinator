@@ -124,4 +124,5 @@ target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)
 
 # hardware drivers
 target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail
-    embedded-fw-base::efr32xg23-emdrv-spidrv embedded-fw-base::efr32xg23-emdrv-uartdrv)
+    embedded-fw-base::efr32xg23-emdrv-spidrv embedded-fw-base::efr32xg23-emdrv-uartdrv
+    embedded-fw-base::efr32xg23-emdrv-tempdrv)
