@@ -67,6 +67,7 @@ void Logger::Init() {
  * @brief Output a log message.
  *
  * @param level Message level
+ * @param buffered Set to bypass background transfers (for panics)
  * @param format Format string, with printf-style substitutions
  * @param args Arguments to format
  *
@@ -77,7 +78,7 @@ void Logger::Init() {
  * @remark Do not add a trailing newline on the message's format string. This is automatically
  *         added, if necessary, to signify the end of a message by the underlying output drivers.
  */
-void Logger::Log(const Level level, const etl::string_view &format, va_list args) {
+void Logger::Log(const Level level, const bool buffered, const etl::string_view &format, va_list args) {
     int numChars{0};
     size_t bufferSz{0}, bytesWritten{0};
     char *buffer{nullptr}, *bufferStart{nullptr};
@@ -92,7 +93,7 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
      * Get the task-specific log buffer (and its length) if the scheduler has been started;
      * otherwise use a statically allocated buffer (which is then re-used for the first task)
      */
-    if(xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
+    if(xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED || !buffered) {
         buffer = gLogBuffer;
         bufferSz = kTaskLogBufferSize;
         hasScheduler = false;
@@ -160,7 +161,7 @@ void Logger::Log(const Level level, const etl::string_view &format, va_list args
     }
     if(kEnableUartTty) {
         // TODO: transmit timestamp, severity as binary
-        if(hasScheduler) {
+        if(hasScheduler && buffered) {
             // use DMA driven transmission here
             UARTDRV_Transmit(sl_uartdrv_eusart_tty_handle, reinterpret_cast<uint8_t *>(bufferStart),
                     bytesWritten, [](auto handle, auto status, auto data, auto dataLen) {
@@ -257,7 +258,7 @@ extern "C" void log_panic(const char *fmt, ...) {
 
     va_list va;
     va_start(va, fmt);
-    Log::Logger::Log(Level::Error, fmt, va);
+    Log::Logger::Log(Level::Error, false, fmt, va);
     va_end(va);
 
     Logger::Panic();
@@ -304,7 +305,7 @@ extern "C" void do_log(const unsigned int inLevel, const char *fmt, ...) {
     }
 
     // perform logging
-    Log::Logger::Log(lvl, fmt, va);
+    Log::Logger::Log(lvl, false, fmt, va);
     va_end(va);
 }
 

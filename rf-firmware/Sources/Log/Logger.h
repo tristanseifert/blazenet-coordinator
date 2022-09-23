@@ -88,7 +88,7 @@ class Logger {
         [[noreturn]] static void Panic(const etl::string_view fmt, ...) {
             va_list va;
             va_start(va, fmt);
-            Log(Level::Error, fmt, va);
+            Log(Level::Error, false, fmt, va);
             va_end(va);
 
             Panic();
@@ -103,7 +103,7 @@ class Logger {
         static void Error(const etl::string_view fmt, ...) {
             va_list va;
             va_start(va, fmt);
-            Log(Level::Error, fmt, va);
+            Log(Level::Error, false, fmt, va);
             va_end(va);
         }
 
@@ -118,7 +118,7 @@ class Logger {
 
             va_list va;
             va_start(va, fmt);
-            Log(Level::Warning, fmt, va);
+            Log(Level::Warning, true, fmt, va);
             va_end(va);
         }
 
@@ -133,7 +133,7 @@ class Logger {
 
             va_list va;
             va_start(va, fmt);
-            Log(Level::Notice, fmt, va);
+            Log(Level::Notice, true, fmt, va);
             va_end(va);
         }
 
@@ -148,7 +148,7 @@ class Logger {
 
             va_list va;
             va_start(va, fmt);
-            Log(Level::Debug, fmt, va);
+            Log(Level::Debug, true, fmt, va);
             va_end(va);
         }
 
@@ -163,11 +163,12 @@ class Logger {
 
             va_list va;
             va_start(va, fmt);
-            Log(Level::Trace, fmt, va);
+            Log(Level::Trace, true, fmt, va);
             va_end(va);
         }
 
-        static void Log(const Level lvl, const etl::string_view &fmt, va_list args);
+        static void Log(const Level lvl, const bool buffered, const etl::string_view &fmt,
+                va_list args);
 
     private:
         [[noreturn]] static void Panic();

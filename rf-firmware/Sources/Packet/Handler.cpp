@@ -37,6 +37,10 @@ Handler::RxPacketBuffer *Handler::EnqueueRxPacket(const struct RAIL_RxPacketInfo
         gRxOverflowFlag = true;
         gRxQueueDiscarded++;
         UpdateRxQueueState();
+
+        if(kLogRxRejects) {
+            Logger::Warning("RX queue full!");
+        }
         return nullptr;
     }
 
@@ -47,6 +51,10 @@ Handler::RxPacketBuffer *Handler::EnqueueRxPacket(const struct RAIL_RxPacketInfo
         gRxOverflowFlag = true;
         gRxBufferDiscarded++;
         UpdateRxQueueState();
+
+        if(kLogRxRejects) {
+            Logger::Warning("Queue overflow (%u alloc)", gRxAllocBytes);
+        }
         return nullptr;
     }
 
@@ -55,8 +63,14 @@ Handler::RxPacketBuffer *Handler::EnqueueRxPacket(const struct RAIL_RxPacketInfo
         gRxOverflowFlag = true;
         gRxBufferAllocFailed++;
         UpdateRxQueueState();
+
+        if(kLogRxRejects) {
+            Logger::Warning("failed to alloc %u bytes", requiredBytes);
+        }
         return nullptr;
     }
+
+    gRxAllocBytes += requiredBytes;
 
     // fill in the buffer
     buffer->packetSize = info.packetBytes;

@@ -176,6 +176,37 @@ uint16_t Task::GetChannel() {
 }
 
 /**
+ * @brief Update the transmit power setting
+ *
+ * Change the power level used for transmission of all future packets. The actual transmit power
+ * may be lower than what's requested.
+ *
+ * @param newPower New transmit power, in units of ⅒th dBm
+ *
+ * @return 0 on success, or a negative error code
+ */
+int Task::SetTxPower(const int16_t newPower) {
+    auto raw = RAIL_ConvertDbmToRaw(gRail, RAIL_TX_POWER_MODE_SUBGIG, newPower);
+    auto status = RAIL_SetTxPower(gRail, raw);
+    if(status != RAIL_STATUS_NO_ERROR) {
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief Get current transmit power setting
+ *
+ * Read out the current power amplifier level.
+ *
+ * @return Transmit power level, in units of ⅒th dBm
+ */
+int16_t Task::GetTxPower() {
+    auto level = RAIL_GetTxPower(gRail);
+    return RAIL_ConvertRawToDbm(gRail, RAIL_TX_POWER_MODE_SUBGIG, level);
+}
+
+/**
  * @brief Check if the radio is active
  *
  * The radio is considered active if it's tuned to a channel, and either in transmit or receive

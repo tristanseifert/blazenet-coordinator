@@ -21,6 +21,9 @@ namespace Packet {
  */
 class Handler {
     private:
+        /// Log information about rejected receive packets
+        constexpr static const bool kLogRxRejects{false};
+
         /**
          * @brief Maximum packet data size
          *

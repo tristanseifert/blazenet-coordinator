@@ -55,6 +55,8 @@ class Task {
 
         static int SetChannel(const uint16_t newChannel);
         static uint16_t GetChannel();
+        static int SetTxPower(const int16_t newPower);
+        static int16_t GetTxPower();
 
         static bool IsActive();
 

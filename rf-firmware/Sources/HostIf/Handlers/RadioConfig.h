@@ -37,10 +37,15 @@ struct RadioConfig {
             Logger::Warning("%s failed: %d", "RadioConfig set channel", err);
             return err;
         }
-        Logger::Debug("new ch: %u", req->channel);
 
         // update TX power
-        // TODO: implement
+        err = Radio::Task::SetTxPower(req->txPower);
+        if(err) {
+            Logger::Warning("%s failed: %d", "RadioConfig set power", err);
+            return err;
+        }
+
+        Logger::Debug("RadioConfig: ch=%u, txpwr=%d", req->channel, req->txPower);
 
         return 0;
     }
