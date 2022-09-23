@@ -102,6 +102,7 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/HostIf/Init.cpp
     Sources/HostIf/IrqManager.cpp
     Sources/HostIf/Task.cpp
+    Sources/HostIf/Watchdog.cpp
     Sources/HostIf/CommandHandlers.cpp
     Sources/Packet/Handler.cpp
     Sources/Drivers/sl_spidrv_init.c
