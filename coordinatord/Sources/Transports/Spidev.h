@@ -8,7 +8,8 @@
 
 #include <toml++/toml.h>
 
-#include "Transports/Transport.h"
+#include "Transports/Commands.h"
+#include "Transports/Base.h"
 
 namespace Transports {
 /**
@@ -17,7 +18,7 @@ namespace Transports {
  * Radio transport for a radio connected via an SPI interface. An interrupt line is required, with
  * an optional reset line.
  */
-class Spidev: public Transport {
+class Spidev: public TransportBase {
     private:
         /**
          * @brief Read command delay (µS)
@@ -35,16 +36,6 @@ class Spidev: public Transport {
          */
         constexpr static const size_t kWriteCmdDelay{10};
 
-        /**
-         * @brief Command structure to send to radio
-         */
-        struct Command {
-            /// Command to execute
-            uint8_t id;
-            /// Length of payload (or requested length of response)
-            uint8_t length;
-        } __attribute__((packed));
-
         /// GPIO provider name
         constexpr static const std::string_view kGpioProviderName{"blazed-spidev"};
 
@@ -54,8 +45,8 @@ class Spidev: public Transport {
 
         void reset() override;
 
-        void sendCommandWithResponse(const uint8_t command, std::span<uint8_t> buffer) override;
-        void sendCommandWithPayload(const uint8_t command,
+        void sendCommandWithResponse(const CommandId command, std::span<uint8_t> buffer) override;
+        void sendCommandWithPayload(const CommandId command,
                 std::span<const uint8_t> payload) override;
 
     private:

@@ -86,10 +86,13 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/Sources/version.c.in ${VERSION_FILE} @O
 add_executable(daemon
     ${VERSION_FILE}
     Sources/Main.cpp
+    Sources/Radio.cpp
+    Sources/Protocol/Handler.cpp
     Sources/Config/Reader.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
+    Sources/Transports/Base.cpp
 )
 
 # Linux-specific transports (TODO: on FreeBSD also?)

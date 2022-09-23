@@ -9,8 +9,11 @@
 #include <stdexcept>
 #include <string>
 
+#include "Radio.h"
 #include "version.h"
 #include "Config/Reader.h"
+#include "Protocol/Handler.h"
+#include "Transports/Base.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -19,6 +22,8 @@
 std::atomic_bool gRun{true};
 /// Main run loop
 static std::shared_ptr<Support::EventLoop> gMainLoop;
+/// Packet handler
+static std::shared_ptr<Protocol::Handler> gHandler;
 
 /// Command line configuration
 static struct {
@@ -86,6 +91,17 @@ static void ParseArgs(const int argc, char **argv) {
 }
 
 /**
+ * @brief Configure radio settings
+ *
+ * Sets up the radio configuration (channel, power, etc.)
+ */
+static void ConfigureRadio(const std::shared_ptr<Radio> &radio) {
+    radio->setChannel(6);
+    radio->setTxPower(80);
+    radio->uploadConfig();
+}
+
+/**
  * @brief Run the deamon's main loop
  */
 static void RunMainLoop() {
@@ -107,7 +123,7 @@ int main(int argc, char **argv) {
         ParseArgs(argc, argv);
     } catch(const std::exception &e) {
         std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
-        return -1;
+        return 1;
     }
 
     Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
@@ -121,7 +137,26 @@ int main(int argc, char **argv) {
         Config::Read(gCliConfig.configFilePath);
     } catch(const std::exception &e) {
         PLOG_FATAL << "Failed to parse config file: " << e.what();
-        return -2;
+        return 1;
+    }
+
+    // perform more initialization
+    try {
+        // set up the radio transport and radio instance
+        auto transport = Transports::TransportBase::Make(Config::GetTransportConfig());
+        if(!transport) {
+            throw std::runtime_error("failed to initialize transport (check transport type)");
+        }
+
+        auto radio = std::make_shared<Radio>(transport);
+
+        // configure radio before setting up packet handler
+        ConfigureRadio(radio);
+
+        gHandler = std::make_shared<Protocol::Handler>(radio);
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Initialization failed: " << e.what();
+        return 1;
     }
 
     // run the event loop on the main thread
@@ -129,6 +164,8 @@ int main(int argc, char **argv) {
 
     // clean up
     PLOG_DEBUG << "Shutting down…";
+
+    gHandler.reset();
 
     gMainLoop.reset();
 }

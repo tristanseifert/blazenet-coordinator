@@ -9,16 +9,23 @@
 #include "Support/Logging.h"
 #include "Config/Reader.h"
 
-#ifdef WITH_TRANSPORT_SPIDEV
-#include "Transports/Spidev.h"
-#endif
-
 using namespace Config;
+
+static toml::table gTransportConfig;
 
 static void ReadConfd(const toml::table &);
 static void ReadRadio(const toml::table &);
 static void ReadRadioTransport(const toml::table &);
 static void ReadRadioRegion(const toml::table &);
+
+/**
+ * @brief Get the radio transport configuration
+ */
+const toml::table &Config::GetTransportConfig() {
+    return gTransportConfig;
+}
+
+
 
 /**
  * @brief Read configuration file from disk
@@ -116,7 +123,7 @@ static void ReadRadio(const toml::table &root) {
  *
  * - type: Kind of transport
  *
- * Based on this type key, we'll initialize a particular transport class.
+ * The configuration table is stored for later consumption during the intialization process.
  */
 static void ReadRadioTransport(const toml::table &root) {
     // get the type string
@@ -125,25 +132,7 @@ static void ReadRadioTransport(const toml::table &root) {
         throw std::runtime_error("missing or invalid `radio.transport.type` key");
     }
 
-    // initialize it
-    const std::string typeStr = type.value_or("");
-    PLOG_VERBOSE << "Radio transport: " << typeStr;
-
-    try {
-#if WITH_TRANSPORT_SPIDEV
-        if(typeStr == "spidev") {
-            auto transport = std::make_shared<Transports::Spidev>(root);
-            (void) transport;
-            return;
-        }
-#endif
-    } catch(const std::exception &e) {
-        PLOG_FATAL << "failed to open transport: " << e.what();
-        throw std::runtime_error("radio transport error");
-    }
-
-    // if we get here, no transport supported
-    throw std::runtime_error(fmt::format("unknown transport `{}`", typeStr));
+    gTransportConfig = root;
 }
 
 /**

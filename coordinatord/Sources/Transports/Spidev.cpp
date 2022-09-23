@@ -229,7 +229,7 @@ void Spidev::reset() {
  * @param command Command id
  * @param buffer Buffer to receive the response
  */
-void Spidev::sendCommandWithResponse(const uint8_t command, std::span<uint8_t> buffer) {
+void Spidev::sendCommandWithResponse(const CommandId command, std::span<uint8_t> buffer) {
     int err;
 
     // validate args and build command
@@ -237,11 +237,12 @@ void Spidev::sendCommandWithResponse(const uint8_t command, std::span<uint8_t> b
         throw std::invalid_argument("buffer empty");
     } else if(buffer.size() > UINT8_MAX) {
         throw std::invalid_argument("buffer too long");
-    } else if(command > 0x7F) {
+    } else if(static_cast<size_t>(command) > 0x7F) {
         throw std::invalid_argument("invalid command id");
     }
 
-    Command cmd{static_cast<uint8_t>(command | 0x80), static_cast<uint8_t>(buffer.size())};
+    const uint8_t rawCmd = static_cast<uint8_t>(command) | 0x80;
+    CommandHeader cmd{rawCmd, static_cast<uint8_t>(buffer.size())};
 
     // build request structure
     std::array<struct spi_ioc_transfer, 2> transfers{{
@@ -273,17 +274,17 @@ void Spidev::sendCommandWithResponse(const uint8_t command, std::span<uint8_t> b
  * @param command Command id
  * @param payload Payload data to send immediately after
  */
-void Spidev::sendCommandWithPayload(const uint8_t command, std::span<const uint8_t> payload) {
+void Spidev::sendCommandWithPayload(const CommandId command, std::span<const uint8_t> payload) {
     int err;
 
     // validate args and build command
     if(payload.size() > UINT8_MAX) {
         throw std::invalid_argument("payload too long");
-    } else if(command > 0x7F) {
+    } else if(static_cast<size_t>(command) > 0x7F) {
         throw std::invalid_argument("invalid command id");
     }
 
-    Command cmd{command, static_cast<uint8_t>(payload.size())};
+    CommandHeader cmd{static_cast<uint8_t>(command), static_cast<uint8_t>(payload.size())};
 
     // build request structure
     std::array<struct spi_ioc_transfer, 2> transfers{{
@@ -326,6 +327,7 @@ void Spidev::handleIrq(int fd, size_t flags) {
     }
 
     // process the event
+    // TODO: implement
     PLOG_INFO << "Event type: " << info.event_type;
 }
 

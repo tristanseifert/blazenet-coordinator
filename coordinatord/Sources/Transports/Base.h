@@ -1,10 +1,14 @@
-#ifndef TRANSPORTS_TRANSPORT_H
-#define TRANSPORTS_TRANSPORT_H
+#ifndef TRANSPORTS_BASE_H
+#define TRANSPORTS_BASE_H
 
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <toml++/toml.h>
 
+#include "Commands.h"
+
+namespace Transports {
 /**
  * @brief Abstract base class for radio transport
  *
@@ -12,9 +16,12 @@
  * commands are passed into the transport using the high level interface, which is then responsible
  * for applying transport-specific framing.
  */
-class Transport {
+class TransportBase {
     public:
-        virtual ~Transport() = default;
+        static std::shared_ptr<TransportBase> Make(const toml::table &root);
+
+    public:
+        virtual ~TransportBase() = default;
 
         /**
          * @brief Reset the radio
@@ -29,7 +36,7 @@ class Transport {
          * @param command Command id
          * @param buffer Buffer to receive the command response
          */
-        virtual void sendCommandWithResponse(const uint8_t command,
+        virtual void sendCommandWithResponse(const CommandId command,
                 std::span<uint8_t> buffer) = 0;
 
         /**
@@ -38,8 +45,9 @@ class Transport {
          * @param command Command id
          * @param payload Data payload to send with the command
          */
-        virtual void sendCommandWithPayload(const uint8_t command,
+        virtual void sendCommandWithPayload(const CommandId command,
                 std::span<const uint8_t> payload) = 0;
 };
+}
 
 #endif
