@@ -106,8 +106,8 @@ void Task::ReadPacket() {
     RAIL_GetRxPacketDetails(gRail, phandle, &details);
     Logger::Notice("Rx(%u) rssi: %d", info.packetBytes, details.rssi);
 
-    // copy packet payload and submit to packet handler
-    // TODO: do this
+    // enqueue the packet (it will be copied)
+    Packet::Handler::EnqueueRxPacket(info, details);
     gRxFrames++;
 
 /*

@@ -14,6 +14,7 @@
 #include "Hw/Identity.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
+#include "Packet/Handler.h"
 #include "Radio/Init.h"
 #include "Rtos/Rtos.h"
 #include "Rtos/Start.h"
@@ -62,7 +63,8 @@ static void SwInit() {
 
     Fs::Init();
 
-    // radio hardware and RAIL stack
+    // radio hardware/RAIL stack, and packet handler
+    Packet::Handler::Init();
     Radio::Init();
 
     // host interface

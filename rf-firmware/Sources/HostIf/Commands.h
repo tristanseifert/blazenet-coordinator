@@ -116,6 +116,40 @@ struct GetStatus {
     /// Transmit queue overflow (packets have been discarded)
     uint8_t txQueueOverflow                     :1;
 } __attribute__((packed));
+
+/**
+ * @brief "Get packet queue status" command response
+ *
+ * Indicates the state of the receive and transmit queues.
+ */
+struct GetPacketQueueStatus {
+    /// Is at least one receive packet pending?
+    uint8_t rxPacketPending                     :1;
+    /// Is there a transmit packet pending?
+    uint8_t txPacketPending                     :1;
+    uint8_t reserved                            :6;
+
+    /// Size of the next packet to be read from the receive queue
+    uint8_t rxPacketSize;
+} __attribute__((packed));
+
+/**
+ * @brief "ReadPacket" command response
+ *
+ * Returns the contents of a buffer slot in the receive queue.
+ *
+ * @remark This does _not_ contain the packet payload length, as it's expected that you previously
+ * retrieved this with a call to GetPacketQueueStatus.
+ */
+struct ReadPacket {
+    /// Packet RSSI (in dB)
+    int8_t rssi;
+    /// Link quality (relative scale, where 0 is worst and 255 is best)
+    uint8_t lqi;
+
+    /// Actual payload data
+    uint8_t payload[];
+} __attribute__((packed));
 };
 
 

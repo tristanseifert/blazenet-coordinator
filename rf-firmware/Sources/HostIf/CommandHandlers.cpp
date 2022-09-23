@@ -11,6 +11,8 @@
 #include "Handlers/GetInfo.h"
 #include "Handlers/RadioConfig.h"
 #include "Handlers/GetStatus.h"
+#include "Handlers/GetPacketQueueStatus.h"
+#include "Handlers/ReadPacket.h"
 
 #include "Task.h"
 
@@ -63,6 +65,22 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
     {
         .flags  = HandlerFlags::SupportsRead,
         .read   = Handlers::GetStatus::DoRead,
+        .write  = nullptr,
+    },
+    // 0x04: IrqConfig
+    {
+
+    },
+    // 0x05: GetPacketQueueStatus
+    {
+        .flags  = HandlerFlags::SupportsRead,
+        .read   = Handlers::GetPacketQueueStatus::DoRead,
+        .write  = nullptr,
+    },
+    // 0x06: ReadPacket
+    {
+        .flags  = HandlerFlags::SupportsRead,
+        .read   = Handlers::ReadPacket::DoRead,
         .write  = nullptr,
     },
 }};
