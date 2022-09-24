@@ -6,9 +6,10 @@
  * Implements the idle callback, which in turn is used to place the processor into a lower power
  * state.
  */
-#include "Rtos.h"
+#include <em_device.h>
 
-#include "em_device.h"
+#include "HostIf/IrqManager.h"
+#include "Rtos.h"
 
 using namespace Rtos;
 
@@ -19,5 +20,6 @@ using namespace Rtos;
  * power state, until the next interrupt.
  */
 extern "C" void vApplicationIdleHook() {
+    HostIf::IrqManager::TickCallback();
     __WFI();
 }

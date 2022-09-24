@@ -124,8 +124,6 @@ void Handler::UpdateRxQueueState() {
     // update interrupt state
     if(!gRxQueue->empty()) {
         HostIf::IrqManager::Assert(HostIf::Interrupt::PacketReceived);
-    } else {
-        HostIf::IrqManager::Deassert(HostIf::Interrupt::PacketReceived);
     }
 }
 
@@ -324,8 +322,6 @@ void Handler::UpdateTxQueueState() {
     // update interrupt state
     if(!gTxPacketsPending) {
         HostIf::IrqManager::Assert(HostIf::Interrupt::TxQueueEmpty);
-    } else {
-        HostIf::IrqManager::Deassert(HostIf::Interrupt::TxQueueEmpty);
     }
 }
 

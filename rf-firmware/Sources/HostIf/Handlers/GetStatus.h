@@ -42,9 +42,6 @@ struct GetStatus {
         temp.txQueueEmpty = Packet::Handler::GetTxEmptyFlag();
         temp.txQueueOverflow = Packet::Handler::GetTxOverflowFlag();
 
-        // clear interrupt flags
-        IrqManager::Deassert(Interrupt::StatusReadCleared);
-
         // copy out the correct amount
         const auto actualNum = etl::min(requested, sizeof(temp));
         memcpy(outBuffer.data(), &temp, actualNum);

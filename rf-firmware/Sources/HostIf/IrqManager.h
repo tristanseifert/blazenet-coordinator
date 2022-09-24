@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "bitflags.h"
+#include "Rtos/Rtos.h"
 
 namespace HostIf {
 /**
@@ -20,8 +21,6 @@ enum class Interrupt: uintptr_t {
      * @brief Command error
      *
      * Set: A command failed with an error code.
-     *
-     * Clear: Read status register
      */
     CommandError                                = (1 << 0),
 
@@ -29,8 +28,6 @@ enum class Interrupt: uintptr_t {
      * @brief Packet received
      *
      * Set: A packet has been received
-     *
-     * Clear: Read out all pending packets
      */
     PacketReceived                              = (1 << 1),
 
@@ -38,8 +35,6 @@ enum class Interrupt: uintptr_t {
      * @brief Packet transmitted
      *
      * Set: A packet was transmitted
-     *
-     * Clear: Read status register
      */
     PacketTransmitted                           = (1 << 2),
 
@@ -47,14 +42,8 @@ enum class Interrupt: uintptr_t {
      * @brief Transmit queue is empty
      *
      * Set: All pending packets are transmitted
-     *
-     * Clear: Read out status register
      */
     TxQueueEmpty                                = (1 << 3),
-
-    /// Mask of interrupts cleared when the status register is read
-    StatusReadCleared                           = (CommandError | PacketTransmitted |
-            TxQueueEmpty),
 };
 ENUM_FLAGS_EX(Interrupt, uintptr_t);
 
@@ -69,6 +58,13 @@ ENUM_FLAGS_EX(Interrupt, uintptr_t);
  *         updated before. Otherwise, the host's interrupt handler may read stale data.
  */
 class IrqManager {
+    private:
+        /// Whether IRQ state changes are logged
+        constexpr static const bool kLogChanges{false};
+
+        /// How many ticks an irq may be pending for before it's considered lost
+        constexpr static const size_t kIrqThreshold{pdMS_TO_TICKS(50)};
+
     public:
         static void Init();
 
@@ -110,8 +106,10 @@ class IrqManager {
          * @param which Interrupt line(s) to be asserted
          */
         static inline void Assert(const Interrupt which) {
+            taskENTER_CRITICAL();
             gActive |= which;
             Update();
+            taskEXIT_CRITICAL();
         }
 
         /**
@@ -122,10 +120,19 @@ class IrqManager {
          *
          * @param which Interrupt line(s) to be deasserted
          */
-        static inline void Deassert(const Interrupt which) {
+        static inline void Acknowledge(const Interrupt which) {
+            taskENTER_CRITICAL();
             gActive &= ~which;
+
+            // clear the lost irq recovery state machine
+            gTicksPending = gPendingStage = 0;
+            gLostIrqRecovery = false;
+
             Update();
+            taskEXIT_CRITICAL();
         }
+
+        static void TickCallback();
 
     private:
         static void Update();
@@ -137,6 +144,13 @@ class IrqManager {
         static Interrupt gMask;
         /// Masked, active interrupts
         static Interrupt gMaskedActive;
+
+        /// Are we currently trying to recover from a lost irq?
+        static bool gLostIrqRecovery;
+        /// Number of ticks an irq has been pending
+        static uint16_t gTicksPending;
+        /// Current stage of irq handling
+        static uint16_t gPendingStage;
 };
 }
 
