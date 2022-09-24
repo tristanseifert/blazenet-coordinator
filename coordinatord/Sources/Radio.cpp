@@ -97,7 +97,7 @@ void Radio::uploadConfig() {
 
     // check that the packet was queued (error flag not set)
     this->queryStatus(status);
-    if(status.errorFlag) {
+    if(!status.cmdSuccess) {
         throw std::runtime_error("failed to set radio config");
     }
 
@@ -306,7 +306,7 @@ void Radio::setIrqConfig(const Transports::Request::IrqConfig &config) {
 
     // check for success
     this->queryStatus(status);
-    if(status.errorFlag) {
+    if(!status.cmdSuccess) {
         throw std::runtime_error("radio reported error setting irq config");
     }
 }
@@ -337,7 +337,7 @@ void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
 
     // check for success
     this->queryStatus(status);
-    if(status.errorFlag) {
+    if(!status.cmdSuccess) {
         throw std::runtime_error("radio reported error from reading packet");
     }
 
@@ -372,7 +372,7 @@ void Radio::transmitPacket(const Transports::Request::TransmitPacket &header,
 
     // check that the packet was queued (error flag not set)
     this->queryStatus(status);
-    if(status.errorFlag) {
+    if(!status.cmdSuccess) {
         throw std::runtime_error("radio reported error on queuing packet");
     }
 }

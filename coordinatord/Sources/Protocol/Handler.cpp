@@ -19,7 +19,6 @@ Handler::Handler(const std::shared_ptr<Radio> &_radio) : radio(_radio) {
     // set up beacon frames
     this->initBeaconBuffer();
     this->initBeaconTimer();
-
 }
 
 /**
