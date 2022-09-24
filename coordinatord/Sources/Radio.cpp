@@ -26,6 +26,12 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
         this->irqHandler();
     });
 
+    Transports::Request::IrqConfig irqConf{};
+    irqConf.rxQueueNotEmpty = true;
+    irqConf.txQueueEmpty = true;
+
+    this->setIrqConfig(irqConf);
+
     /*
      * Read out general information about the radio, to ensure that we can successfully
      * communicate with it, and store it for later.
@@ -79,7 +85,7 @@ void Radio::uploadConfig() {
     Transports::Response::GetStatus status;
 
     // build the command
-    Transports::Request::RadioConfig conf;
+    Transports::Request::RadioConfig conf{};
 
     conf.channel = this->currentChannel;
     conf.txPower = this->currentTxPower;
@@ -116,8 +122,8 @@ void Radio::queueTransmitPacket(const PacketPriority priority,
     std::lock_guard lg(this->txQueueLock);
     if(std::all_of(this->txQueues.begin(), this->txQueues.end(),
                 std::bind(&TxQueue::empty, std::placeholders::_1))) {
-        // build the packet header
-        Transports::Request::TransmitPacket header;
+        // build the request header
+        Transports::Request::TransmitPacket header{};
         header.priority = static_cast<uint8_t>(priority);
 
         // transmit to radio
@@ -142,6 +148,24 @@ void Radio::queueTransmitPacket(const PacketPriority priority,
     this->txQueues.at(static_cast<size_t>(priority)).emplace(std::move(pbuf));
 }
 
+/**
+ * @brief Send the provided packet to the radio
+ *
+ * Transmit the packet to the radio for transmission over the air.
+ *
+ * @param packet Packet buffer previously queued
+ */
+void Radio::transmitPacket(const std::unique_ptr<TxPacket> &packet) {
+    // build the request header
+    Transports::Request::TransmitPacket header{};
+    header.priority = static_cast<uint8_t>(packet->priority);
+
+    // perform the command
+    std::lock_guard lg(this->transportLock);
+    this->transmitPacket(header, packet->payload);
+}
+
+
 
 /**
  * @brief Interrupt handler
@@ -151,7 +175,7 @@ void Radio::queueTransmitPacket(const PacketPriority priority,
  */
 void Radio::irqHandler() {
     bool checkAgain;
-    Transports::Response::GetStatus status;
+    Transports::Response::GetStatus status{};
 
     std::lock_guard lg(this->transportLock);
 
@@ -160,7 +184,7 @@ void Radio::irqHandler() {
         this->queryStatus(status);
         checkAgain = false;
 
-        PLOG_INFO << fmt::format("status register: 0b{:08b}", *((uint8_t *) &status));
+        PLOG_DEBUG << fmt::format("status register: 0b{:08b}", *((uint8_t *) &status));
 
         // read a packet
         if(status.rxQueueNotEmpty) {
@@ -174,7 +198,7 @@ void Radio::irqHandler() {
 
         // transmit queue is empty
         if(status.txQueueEmpty) {
-            // TODO: send pending queued packets
+            checkAgain = this->drainTxQueue();
         }
     } while(checkAgain);
 }
@@ -186,8 +210,8 @@ void Radio::irqHandler() {
  * submitted to the upper layer packet handler.
  */
 void Radio::readPacket() {
-    Transports::Response::GetPacketQueueStatus status;
-    Transports::Response::ReadPacket packet;
+    Transports::Response::GetPacketQueueStatus status{};
+    Transports::Response::ReadPacket packet{};
     std::vector<std::byte> packetData;
 
     // read packet queue status
@@ -201,6 +225,45 @@ void Radio::readPacket() {
     // allocate packet buffer and read
     packetData.resize(status.rxPacketSize);
     this->readPacket(packet, packetData);
+}
+
+/**
+ * @brief Read packets out of our internal queue until the radio says "no more"
+ *
+ * This will write packets to the radio until a transmit command fails, or all buffered packets
+ * have been dealt with.
+ *
+ * @return Whether any packets were sent to the radio
+ */
+bool Radio::drainTxQueue() {
+    bool sent{false};
+    std::lock_guard lg(this->txQueueLock);
+
+    for(size_t i = 0; i < this->txQueues.size(); i++) {
+        auto &queue = this->txQueues.at(3 - i);
+
+        // skip empty queues
+        if(queue.empty()) {
+            continue;
+        }
+
+        // pop a packet buffer to read
+        auto &packet = queue.front();
+        try {
+            this->transmitPacket(packet);
+            sent = true;
+        }
+        // if this fails, abort the drainage process
+        catch(const std::exception &e) {
+            PLOG_WARNING << "failed to transmit packet during tx queue drain: " << e.what();
+            return sent;
+        }
+
+        // it was sent to the radio, so we can remove it out of the queue
+        queue.pop();
+    }
+
+    return sent;
 }
 
 
@@ -230,6 +293,25 @@ void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
 }
 
 /**
+ * @brief Set the radio's interrupt configuration
+ *
+ * @param config Interrupt configuration to apply
+ */
+void Radio::setIrqConfig(const Transports::Request::IrqConfig &config) {
+    Transports::Response::GetStatus status{};
+
+    // execute request
+    this->transport->sendCommandWithPayload(Transports::CommandId::IrqConfig,
+            {reinterpret_cast<const std::byte *>(&config), sizeof(config)});
+
+    // check for success
+    this->queryStatus(status);
+    if(status.errorFlag) {
+        throw std::runtime_error("radio reported error setting irq config");
+    }
+}
+
+/**
  * @brief Execute the "get packet queue status" command
  *
  * @param outStatus Packet queue status structure to fill
@@ -247,11 +329,17 @@ void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &o
  */
 void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
         std::span<std::byte> payloadBuf) {
+    Transports::Response::GetStatus status{};
+
     // prepare our receive buffer, then do request
     this->rxBuffer.resize(sizeof(outHeader) + payloadBuf.size());
     this->transport->sendCommandWithResponse(Transports::CommandId::ReadPacket, this->rxBuffer);
 
-    // TODO: check for success
+    // check for success
+    this->queryStatus(status);
+    if(status.errorFlag) {
+        throw std::runtime_error("radio reported error from reading packet");
+    }
 
     // copy out data
     auto header = reinterpret_cast<const Transports::Response::ReadPacket*>(this->rxBuffer.data());
@@ -272,7 +360,7 @@ void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
  */
 void Radio::transmitPacket(const Transports::Request::TransmitPacket &header,
         std::span<const std::byte> payload) {
-    Transports::Response::GetStatus status;
+    Transports::Response::GetStatus status{};
 
     // prepare the transmit buffer
     this->txBuffer.resize(sizeof(header) + payload.size());

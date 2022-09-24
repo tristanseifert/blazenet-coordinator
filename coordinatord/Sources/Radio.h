@@ -18,9 +18,11 @@ struct GetInfo;
 struct GetStatus;
 struct GetPacketQueueStatus;
 struct ReadPacket;
+struct IrqConfig;
 }
 
 namespace Request {
+using IrqConfig = Response::IrqConfig;
 struct TransmitPacket;
 }
 }
@@ -135,11 +137,15 @@ class Radio {
                 std::span<const std::byte> payload);
 
     private:
+        void transmitPacket(const std::unique_ptr<TxPacket> &);
+
         void irqHandler();
         void readPacket();
+        bool drainTxQueue();
 
         void queryRadioInfo(Transports::Response::GetInfo &);
         void queryStatus(Transports::Response::GetStatus &);
+        void setIrqConfig(const Transports::Request::IrqConfig &);
         void queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &);
         void readPacket(Transports::Response::ReadPacket &, std::span<std::byte>);
         void transmitPacket(const Transports::Request::TransmitPacket &,

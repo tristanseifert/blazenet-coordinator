@@ -74,6 +74,5 @@ void Handler::initBeaconTimer() {
  * @brief Transmit a beacon frame.
  */
 void Handler::sendBeacon() {
-    PLOG_VERBOSE << "secreting beacon";
     this->radio->queueTransmitPacket(Radio::PacketPriority::NetworkControl, this->beaconBuffer);
 }
