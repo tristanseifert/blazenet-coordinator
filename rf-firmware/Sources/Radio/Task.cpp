@@ -1,5 +1,6 @@
 #include <rail.h>
 
+#include "HostIf/Commands.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
 #include "Packet/Handler.h"
@@ -23,16 +24,16 @@ const RAIL_CsmaConfig_t Task::gCsmaConfig{
     .csmaMinBoExp       = 3,
     // [0, 31] backoffs for 3rd+ attempt
     .csmaMaxBoExp       = 5,
-    // 5 total attempts (4 retries)
-    .csmaTries          = 5,
+    // 6 total attempts (5 retries)
+    .csmaTries          = 6,
     // clear channel threshold
     .ccaThreshold       = -75,
     // backoff duration: 50 symbols at 4µs/symbol
-    .ccaBackoff         = 160,
+    .ccaBackoff         = 200,
     // listening period: 10 symbols at 4µS/symbol
     .ccaDuration        = 40,
     // total timeout for CSMA (µS)
-    .csmaTimeout        = 5'000,
+    .csmaTimeout        = 10'000,
 };
 
 /**
@@ -338,6 +339,23 @@ int16_t Task::GetTxPower() {
 bool Task::IsActive() {
     auto state = RAIL_GetRadioState(gRail);
     return (state & RAIL_RF_STATE_RX) | (state & RAIL_RF_STATE_TX);
+}
+
+/**
+ * @brief Read out reset performance counters
+ *
+ * @param packet Packet to receive the performance counter data
+ */
+void Task::ReadCounters(HostIf::Response::GetCounters *packet) {
+    // rx counters
+    packet->rxRadio.fifoOverflows = etl::exchange(gRxFifoOverflows, 0);
+    packet->rxRadio.frameErrors = etl::exchange(gRxFrameErrors, 0);
+    packet->rxRadio.goodFrames = etl::exchange(gRxFrames, 0);
+
+    // tx counters
+    packet->txRadio.fifoDrops = etl::exchange(gTxFifoDrops, 0);
+    packet->txRadio.ccaFails = etl::exchange(gTxCcaFails, 0);
+    packet->txRadio.goodFrames = etl::exchange(gTxFrames, 0);
 }
 
 

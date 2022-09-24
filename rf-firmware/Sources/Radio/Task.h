@@ -15,6 +15,10 @@ extern "C" {
 void sl_rail_util_on_event(RAIL_Handle_t, RAIL_Events_t);
 };
 
+namespace HostIf::Response {
+struct GetCounters;
+}
+
 namespace Radio {
 /**
  * @brief Radio management task
@@ -83,6 +87,8 @@ class Task {
         static bool IsActive();
 
         [[nodiscard]] static int TxPacketImmediate(Packet::Handler::TxPacketBuffer *packet);
+
+        static void ReadCounters(HostIf::Response::GetCounters *packet);
 
     private:
         static void InitAutoAck();

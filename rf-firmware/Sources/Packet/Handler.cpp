@@ -1,6 +1,7 @@
 #include <rail.h>
 #include <stdlib.h>
 
+#include "HostIf/Commands.h"
 #include "HostIf/IrqManager.h"
 #include "Log/Logger.h"
 #include "Radio/Task.h"
@@ -326,4 +327,27 @@ void Handler::UpdateTxQueueState() {
     } else {
         HostIf::IrqManager::Deassert(HostIf::Interrupt::TxQueueEmpty);
     }
+}
+
+/**
+ * @brief Read out reset performance counters
+ *
+ * @param packet Packet to receive the performance counter data
+ */
+void Handler::ReadCounters(HostIf::Response::GetCounters *packet) {
+    // rx counters
+    packet->rxQueue.bufferDiscards = etl::exchange(gRxBufferDiscarded, 0);
+    packet->rxQueue.bufferAllocFails = etl::exchange(gRxBufferAllocFailed, 0);
+    packet->rxQueue.queueDiscards = etl::exchange(gRxQueueDiscarded, 0);
+
+    packet->rxQueue.packetsPending = gRxQueue->size();
+    packet->rxQueue.bufferSize = gRxAllocBytes;
+
+    // tx counters
+    packet->txQueue.packetsPending = gTxPacketsPending;
+    packet->txQueue.bufferSize = gTxAllocBytes;
+
+    packet->txQueue.bufferDiscards = etl::exchange(gTxBufferDiscarded, 0);
+    packet->txQueue.bufferAllocFails = etl::exchange(gTxBufferAllocFailed, 0);
+    packet->txQueue.queueDiscards = etl::exchange(gTxQueueDiscarded, 0);
 }

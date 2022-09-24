@@ -55,7 +55,7 @@ class Task {
         /// Maximum payload size (bytes)
         static const constexpr size_t kMaxPayloadSize{256};
         /// Maximum supported command id (TODO: keep in sync with CommandId enum)
-        static const constexpr size_t kMaxCommandId{0x09};
+        static const constexpr size_t kMaxCommandId{0x0A};
 
         /**
          * @brief Command handler

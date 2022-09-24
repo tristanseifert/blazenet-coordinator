@@ -18,6 +18,7 @@ enum class CommandId: uint8_t {
     ReadPacket                                  = 0x06,
     TransmitPacket                              = 0x07,
     BeaconConfig                                = 0x08,
+    GetCounters                                 = 0x09,
 
     /// Total number of defined commands
     NumCommands,
@@ -99,23 +100,23 @@ struct GetInfo {
  */
 struct GetStatus {
     /// Last command was successful
-    uint8_t cmdSuccess                          :1;
+    uint8_t cmdSuccess                          :1{0};
     /// Radio is active (tuned to channel and receiving or transmitting)
-    uint8_t radioActive                         :1;
+    uint8_t radioActive                         :1{0};
 
     /// At least one packet is pending in the receive queue
-    uint8_t rxQueueNotEmpty                     :1;
+    uint8_t rxQueueNotEmpty                     :1{0};
     /// The receive queue is full
-    uint8_t rxQueueFull                         :1;
+    uint8_t rxQueueFull                         :1{0};
     /// Receive queue overflow (packets have been discarded)
-    uint8_t rxQueueOverflow                     :1;
+    uint8_t rxQueueOverflow                     :1{0};
 
     /// Transmit queue is empty
-    uint8_t txQueueEmpty                        :1;
+    uint8_t txQueueEmpty                        :1{0};
     /// Transmit queue is full
-    uint8_t txQueueFull                         :1;
+    uint8_t txQueueFull                         :1{0};
     /// Transmit queue overflow (packets have been discarded)
-    uint8_t txQueueOverflow                     :1;
+    uint8_t txQueueOverflow                     :1{0};
 } __attribute__((packed));
 
 /**
@@ -132,7 +133,7 @@ struct IrqConfig {
      *
      * Clear: Read status register
      */
-    uint8_t commandError                        :1;
+    uint8_t commandError                        :1{0};
 
     /**
      * @brief Receive queue not empty
@@ -141,7 +142,7 @@ struct IrqConfig {
      *
      * Clear: Read out all pending packets
      */
-    uint8_t rxQueueNotEmpty                     :1;
+    uint8_t rxQueueNotEmpty                     :1{0};
 
     /**
      * @brief Packet transmitted
@@ -150,7 +151,7 @@ struct IrqConfig {
      *
      * Clear: Read status register
      */
-    uint8_t txPacket                            :1;
+    uint8_t txPacket                            :1{0};
 
     /**
      * @brief Transmit queue empty
@@ -159,9 +160,9 @@ struct IrqConfig {
      *
      * Clear: Read status register
      */
-    uint8_t txQueueEmpty                        :1;
+    uint8_t txQueueEmpty                        :1{0};
 
-    uint8_t reserved                            :4;
+    uint8_t reserved                            :4{};
 } __attribute__((packed));
 
 /**
@@ -171,13 +172,13 @@ struct IrqConfig {
  */
 struct GetPacketQueueStatus {
     /// Is at least one receive packet pending?
-    uint8_t rxPacketPending                     :1;
+    uint8_t rxPacketPending                     :1{0};
     /// Is there a transmit packet pending?
-    uint8_t txPacketPending                     :1;
-    uint8_t reserved                            :6;
+    uint8_t txPacketPending                     :1{0};
+    uint8_t reserved                            :6{0};
 
     /// Size of the next packet to be read from the receive queue
-    uint8_t rxPacketSize;
+    uint8_t rxPacketSize{};
 } __attribute__((packed));
 
 /**
@@ -196,6 +197,65 @@ struct ReadPacket {
 
     /// Actual payload data
     uint8_t payload[];
+} __attribute__((packed));
+
+/**
+ * @brief "GetCounters" command response
+ *
+ * Reads out various performance counters to the host. If this command completes successfully, the
+ * counters will be cleared to zero.
+ */
+struct GetCounters {
+    /// Current internal tick timestamp
+    uint32_t currentTicks;
+
+    /// Transmit queue
+    struct {
+        /// Current number of packets pending
+        uint32_t packetsPending;
+        /// Number of bytes currently allocated
+        uint32_t bufferSize;
+
+        /// Packets discarded because buffer size limit was reached
+        uint32_t bufferDiscards;
+        /// Packets discarded because allocation failed (other reason)
+        uint32_t bufferAllocFails;
+        /// Packets discarded because queue is full
+        uint32_t queueDiscards;
+    } txQueue;
+    /// Radio (transmit)
+    struct {
+        /// Drops because FIFO is full
+        uint32_t fifoDrops;
+        /// CSMA detection fails
+        uint32_t ccaFails;
+        /// Number of successfully transmitted frames
+        uint32_t goodFrames;
+    } txRadio;
+
+    /// Receive queue
+    struct {
+        /// Current number of packets pending
+        uint32_t packetsPending;
+        /// Number of bytes currently allocated
+        uint32_t bufferSize;
+
+        /// Packets discarded because buffer size limit was reached
+        uint32_t bufferDiscards;
+        /// Packets discarded because allocation failed (other reason)
+        uint32_t bufferAllocFails;
+        /// Packets discarded because queue is full
+        uint32_t queueDiscards;
+    } rxQueue;
+    /// Radio (receive)
+    struct {
+        /// FIFO overflows
+        uint32_t fifoOverflows;
+        /// Frame errors
+        uint32_t frameErrors;
+        /// Number of good frames
+        uint32_t goodFrames;
+    } rxRadio;
 } __attribute__((packed));
 };
 

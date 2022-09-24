@@ -8,6 +8,10 @@
 #include <etl/queue.h>
 #include <etl/span.h>
 
+namespace HostIf::Response {
+struct GetCounters;
+}
+
 namespace Packet {
 /**
  * @brief Packet receive and transmit handler
@@ -268,6 +272,8 @@ class Handler {
         static inline bool GetTxEmptyFlag() {
             return !gTxPacketsPending;
         }
+
+        static void ReadCounters(HostIf::Response::GetCounters *packet);
 
     private:
         static void UpdateRxQueueState();
