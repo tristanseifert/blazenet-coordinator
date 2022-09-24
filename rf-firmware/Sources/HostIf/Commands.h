@@ -17,6 +17,7 @@ enum class CommandId: uint8_t {
     GetPacketQueueStatus                        = 0x05,
     ReadPacket                                  = 0x06,
     TransmitPacket                              = 0x07,
+    BeaconConfig                                = 0x08,
 
     /// Total number of defined commands
     NumCommands,
@@ -249,6 +250,41 @@ struct TransmitPacket {
  * This is the same format as the read out command.
  */
 using IrqConfig = Response::IrqConfig;
+
+/**
+ * @brief "BeaconConfig" command
+ *
+ * Configures automatic beacon transmission. If only the first two fields are specified (that is,
+ * the command is sent such that the payload length is 0) the payload will not be altered.
+ */
+struct BeaconConfig {
+    /**
+     * @brief Update configuration
+     *
+     * When set, the basic beacon configuration is updated. This can be cleared to only update the
+     * packet payload instead of the configuration.
+     */
+    uint8_t updateConfig                        :1{0};
+
+    /**
+     * @brief Are automatic beacons enabled?
+     */
+    uint8_t enabled                             :1{0};
+
+    uint8_t reserved                            :6{0};
+
+    /**
+     * @brief Beacon interval, in ms
+     */
+    uint16_t interval;
+
+    /**
+     * @brief Beacon frame payload
+     *
+     * All data that follows here is considered part of the beacon frame.
+     */
+    uint8_t data[];
+} __attribute__((packed));
 };
 }
 

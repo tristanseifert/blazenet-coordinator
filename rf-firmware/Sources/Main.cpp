@@ -8,6 +8,7 @@
 #include "Drivers/sl_uartdrv_instances.h"
 
 #include "BuildInfo.h"
+#include "BlazeNet/Init.h"
 #include "Fs/Init.h"
 #include "HostIf/Init.h"
 #include "Hw/Clocks.h"
@@ -66,6 +67,8 @@ static void SwInit() {
     // radio hardware/RAIL stack, and packet handler
     Packet::Handler::Init();
     Radio::Init();
+
+    BlazeNet::Init();
 
     // host interface
     HostIf::Init();

@@ -282,7 +282,7 @@ int Handler::QueueTxPacketFinal(TxQueueType *queue, TxPacketBuffer *buffer) {
         queue->emplace(buffer);
 
         if(kLogTx) {
-            Logger::Trace("%s: queue%u %u/%u", "tx", queue->available(), queue->capacity(),
+            Logger::Trace("%s: queue %u/%u (%p)", "tx", queue->available(), queue->capacity(),
                     buffer);
         }
     }

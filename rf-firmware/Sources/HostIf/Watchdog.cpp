@@ -1,3 +1,4 @@
+#include "BlazeNet/Beacon.h"
 #include "Hw/Indicators.h"
 #include "Log/Logger.h"
 #include "Rtos/Rtos.h"
@@ -38,6 +39,9 @@ void Watchdog::Init() {
 void Watchdog::HandleCommsLost() {
     gCommsLostFlag = true;
     Hw::Indicators::BlinkAttentionFast();
+
+    // notify components
+    BlazeNet::Beacon::CommsLost();
 }
 
 /**
@@ -48,6 +52,8 @@ void Watchdog::HandleCommsLost() {
 void Watchdog::HandleCommsRegained() {
     gCommsLostFlag = false;
     Hw::Indicators::TurnOffAttention();
+
+    BlazeNet::Beacon::CommsRegained();
 
     Logger::Notice("host comms regained");
 }

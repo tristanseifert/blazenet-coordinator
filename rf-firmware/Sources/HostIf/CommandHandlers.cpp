@@ -15,6 +15,7 @@
 #include "Handlers/GetPacketQueueStatus.h"
 #include "Handlers/ReadPacket.h"
 #include "Handlers/TransmitPacket.h"
+#include "Handlers/BeaconConfig.h"
 
 #include "Task.h"
 
@@ -93,6 +94,12 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
         .read   = nullptr,
         .write  = Handlers::TransmitPacket::DoWrite,
     },
+    // 0x08: BeaconConfig
+    {
+        .flags  = HandlerFlags::SupportsWrite,
+        .read   = nullptr,
+        .write  = Handlers::BeaconConfig::DoWrite,
+    }
 }};
 
 #endif
