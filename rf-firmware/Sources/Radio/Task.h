@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "rail.h"
+#include <rail.h>
 
 #include <etl/string_view.h>
 
@@ -40,6 +40,17 @@ class Task {
         static const constexpr bool kLogRx{false};
         /// Should transmit packets be logged?
         static const constexpr bool kLogTx{false};
+        /// Should CSMA transmit failures be logged?
+        static const constexpr bool kLogTxCsmaRetries{true};
+
+        /**
+         * @brief Enable clear channel assessment before transmit
+         *
+         * When set, CSMA is used to ensure the channel is clear before transmitting.
+         */
+        static const constexpr bool kUseCca{true};
+        /// Maximum number of CSMA failures before packet is dropped
+        static const constexpr size_t kMaxCsmaFails{5};
 
     private:
         /**
@@ -75,6 +86,7 @@ class Task {
 
     private:
         static void InitAutoAck();
+        static void InitCsma();
 
         static void Main();
 
@@ -82,6 +94,9 @@ class Task {
         static void HandleTxComplete();
 
     private:
+        /// CSMA configuration
+        static const RAIL_CsmaConfig_t gCsmaConfig;
+
         /// FreeRTOS Task handle
         static TaskHandle_t gTask;
         /// Radio interface handle (used for all later interfaces)

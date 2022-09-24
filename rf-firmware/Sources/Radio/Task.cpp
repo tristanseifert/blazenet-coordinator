@@ -18,6 +18,23 @@ uint16_t Task::gTxChannel{UINT16_MAX};
 size_t Task::gTxFifoDrops{0}, Task::gTxCcaFails{0}, Task::gTxFrames{0};
 Packet::Handler::TxPacketBuffer *Task::gLastTx{nullptr};
 
+const RAIL_CsmaConfig_t Task::gCsmaConfig{
+    // [0, 7] backoffs on 1st attempt
+    .csmaMinBoExp       = 3,
+    // [0, 31] backoffs for 3rd+ attempt
+    .csmaMaxBoExp       = 5,
+    // 5 total attempts (4 retries)
+    .csmaTries          = 5,
+    // clear channel threshold
+    .ccaThreshold       = -75,
+    // backoff duration: 50 symbols at 4µs/symbol
+    .ccaBackoff         = 160,
+    // listening period: 10 symbols at 4µS/symbol
+    .ccaDuration        = 40,
+    // total timeout for CSMA (µS)
+    .csmaTimeout        = 5'000,
+};
+
 /**
  * @brief Initialize the radio task
  *
@@ -62,13 +79,16 @@ void Task::InitAutoAck() {
  * @brief Task main loop
  */
 void Task::Main() {
+    int err;
     BaseType_t ok;
 
     // perform deferred setup
     Logger::Trace("%s: init", "Radio");
 
     RAIL_ResetFifo(gRail, true, true);
-    InitAutoAck();
+
+    // TODO: handle more stuff
+    // InitAutoAck();
 
     // wait for event
     while(true) {
@@ -91,10 +111,25 @@ void Task::Main() {
 
             HandleTxComplete();
         }
-        // failed to transmit packet: channel busy
+        // failed to transmit packet: channel busy. retry again
         if(note & NotifyBits::TxChannelBusy) {
-            // TODO: implement this
-            Logger::Panic("can't tx %p: channel busy", gLastTx);
+            REQUIRE(gLastTx, "CSMA failed, but no current packet?");
+
+            // ensure it's not over the attempts
+            if(++gLastTx->csmaFailCount < kMaxCsmaFails) {
+                if(kLogTxCsmaRetries) {
+                    Logger::Notice("tx %p: CSMA retry %u/%u", gLastTx, gLastTx->csmaFailCount,
+                            kMaxCsmaFails);
+                }
+
+                err = TxPacketImmediate(gLastTx);
+                REQUIRE(!err, "%s failed: %d", "TxPacketImmediate", err);
+            }
+            // otherwise, discard the packet
+            else {
+                Logger::Warning("dropped packet %p due to CSMA fail", gLastTx);
+                HandleTxComplete();
+            }
         }
     }
 }
@@ -162,8 +197,11 @@ int Task::TxPacketImmediate(Packet::Handler::TxPacketBuffer *packet) {
     }
 
     // begin transmit
-    // TODO: use CSMA
-    err = RAIL_StartTx(gRail, gTxChannel, 0, nullptr);
+    if(kUseCca) {
+        err = RAIL_StartCcaCsmaTx(gRail, gTxChannel, 0, &gCsmaConfig, nullptr);
+    } else {
+        err = RAIL_StartTx(gRail, gTxChannel, 0, nullptr);
+    }
     if(err != RAIL_STATUS_NO_ERROR) {
         return -2;
     }

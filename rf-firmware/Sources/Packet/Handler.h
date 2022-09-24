@@ -97,7 +97,15 @@ class Handler {
             /**
              * @brief Size of the payload, in bytes
              */
-            uint16_t packetSize;
+            uint16_t packetSize{};
+
+            /**
+             * @brief Number of times CSMA failed for this packet
+             *
+             * This counter contains the number of times the packet could not be sent due to CSMA
+             * failures.
+             */
+            uint8_t csmaFailCount{0};
 
             /**
              * @brief Packet payload
