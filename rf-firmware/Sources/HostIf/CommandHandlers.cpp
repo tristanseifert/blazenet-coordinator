@@ -17,6 +17,7 @@
 #include "Handlers/TransmitPacket.h"
 #include "Handlers/BeaconConfig.h"
 #include "Handlers/GetCounters.h"
+#include "Handlers/IrqStatus.h"
 
 #include "Task.h"
 
@@ -83,6 +84,12 @@ const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandler
         .flags  = HandlerFlags::SupportsRead,
         .read   = Handlers::GetCounters::DoRead,
         .write  = nullptr,
+    },
+    // 0x0A: IrqStatus
+    {
+        .flags  = (HandlerFlags::SupportsRead | HandlerFlags::SupportsWrite),
+        .read   = Handlers::IrqStatus::DoRead,
+        .write  = Handlers::IrqStatus::DoWrite,
     },
 }};
 

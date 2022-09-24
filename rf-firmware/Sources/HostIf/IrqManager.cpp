@@ -4,6 +4,7 @@
 #include "gecko-config/pin_config.h"
 
 #include "Log/Logger.h"
+#include "Rtos/Rtos.h"
 
 #include "IrqManager.h"
 
@@ -11,6 +12,9 @@ using namespace HostIf;
 
 Interrupt IrqManager::gActive{Interrupt::None}, IrqManager::gMask{Interrupt::None},
           IrqManager::gMaskedActive{Interrupt::None};
+
+bool IrqManager::gLostIrqRecovery{false};
+uint16_t IrqManager::gTicksPending{0}, IrqManager::gPendingStage{0};
 
 /**
  * @brief Set the status of the host-facing IRQ line
@@ -42,10 +46,61 @@ void IrqManager::Init() {
  * non-zero, assert the interrupt line.
  */
 void IrqManager::Update() {
-    auto result = gActive & gMask;
+    taskENTER_CRITICAL();
 
-    if(result != gMaskedActive) {
+    // perform update as normal
+    auto result = gActive & gMask;
+    const auto prev = gMaskedActive;
+    const auto changed = (result != gMaskedActive);
+
+    if(!gLostIrqRecovery) {
         SetIrqStatus(TestFlags(result));
-        gMaskedActive = result;
+    }
+    gMaskedActive = result;
+
+    taskEXIT_CRITICAL();
+
+    // optional logging later
+    if(changed) {
+        if(kLogChanges) {
+            Logger::Notice("IRQ: %08x -> %08x", prev, result);
+        }
+    }
+}
+
+/**
+ * @brief Tick callback
+ *
+ * This checks how long an interrupt has been pending for; if it's been more than a certain number
+ * of ticks, we'll pulse the interrupt line. This makes up for a host losing interrupts due to
+ * agressive filtering.
+ */
+void IrqManager::TickCallback() {
+    if((TestFlags(gMaskedActive) && ++gTicksPending > kIrqThreshold) || gLostIrqRecovery) {
+        taskENTER_CRITICAL();
+
+        // stage 0: de-assert irq line
+        if(gPendingStage == 0) {
+            SetIrqStatus(false);
+
+            gLostIrqRecovery = true;
+            gPendingStage = 1;
+        }
+        else if(gPendingStage == 1 || gPendingStage == 2) {
+            gPendingStage++;
+        }
+        // stage 1: re-assert irq line
+        else if(gPendingStage == 3) {
+            SetIrqStatus(true);
+            gPendingStage = 3;
+        }
+        // stage 2: profit
+        else if(gPendingStage == 4) {
+            gLostIrqRecovery = false;
+            gTicksPending = 0;
+            gPendingStage = 0;
+        }
+
+        taskEXIT_CRITICAL();
     }
 }
