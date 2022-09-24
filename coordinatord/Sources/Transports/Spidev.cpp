@@ -30,6 +30,7 @@ using namespace std::chrono_literals;
  * after the command is complete.
  */
 const std::unordered_map<CommandId, std::chrono::microseconds> Spidev::gWriteDelays{
+    { CommandId::RadioConfig,           150us },
     { CommandId::TransmitPacket,         50us },
     { CommandId::BeaconConfig,          250us },
 };

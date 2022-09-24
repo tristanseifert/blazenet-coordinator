@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <span>
 #include <vector>
 #include <queue>
@@ -21,10 +22,12 @@ struct GetStatus;
 struct GetPacketQueueStatus;
 struct ReadPacket;
 struct IrqConfig;
+struct IrqStatus;
 }
 
 namespace Request {
 using IrqConfig = Response::IrqConfig;
+using IrqStatus = Response::IrqStatus;
 struct TransmitPacket;
 }
 }
@@ -160,6 +163,10 @@ class Radio {
 
         /// Minimum beacon interval (msec)
         constexpr static const size_t kMinBeaconInterval{1'000};
+        /// Interrupt watchdog interval (msec)
+        constexpr static const size_t kIrqWatchdogInterval{50};
+        /// How long we can go without an irq (msec)
+        constexpr static const size_t kIrqWatchdogThreshold{250};
         /// Performance counter read interval (sec)
         constexpr static const size_t kPerfCounterReadInterval{30};
 
@@ -253,8 +260,11 @@ class Radio {
         void counterReaderFired();
         void queryCounters();
 
+        void initWatchdog();
+        void irqWatchdogFired();
         void irqHandler();
-        void readPacket();
+        void irqHandlerCommon(const Transports::Response::IrqStatus &);
+        void readPacket(bool &);
         bool drainTxQueue();
 
         void queryRadioInfo(Transports::Response::GetInfo &);
@@ -264,6 +274,11 @@ class Radio {
         void readPacket(Transports::Response::ReadPacket &, std::span<std::byte>);
         void transmitPacket(const Transports::Request::TransmitPacket &,
                 std::span<const std::byte>);
+
+        void getPendingInterrupts(Transports::Response::IrqStatus &);
+        void acknowledgeInterrupts(const Transports::Request::IrqStatus &);
+
+        void ensureCmdSuccess(const std::string_view);
 
     private:
         /// Interface used to communicate with the radio
@@ -295,6 +310,13 @@ class Radio {
         uint16_t maxTxPower;
         /// Current transmit power
         uint16_t currentTxPower;
+
+        /// Number of interrupts triggered
+        size_t irqCounter{0};
+        /// Irq watchdog timer
+        struct event *irqWatchdog{nullptr};
+        /// last irq
+        std::chrono::time_point<std::chrono::high_resolution_clock> lastIrq;
 
         /// Periodic event to read out the performance counters
         struct event *counterReader{nullptr};

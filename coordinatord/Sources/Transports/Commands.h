@@ -117,6 +117,15 @@ enum class CommandId: uint8_t {
      * Reads are supported.
      */
     GetCounters                                 = 0x09,
+
+    /**
+     * @brief Interrupt status register
+     *
+     * Read the currently pending interrupts, and clear them.
+     *
+     * Reads and writes are supported.
+     */
+    IrqStatus                                   = 0x0A,
 };
 
 /**
@@ -345,6 +354,43 @@ struct GetCounters {
         uint32_t goodFrames;
     } rxRadio;
 } __attribute__((packed));
+
+/**
+ * @brief Response to an "IRQ Status" command
+ *
+ * This reads out the interrupt status register, showing which interrupts are currently active.
+ */
+struct IrqStatus {
+    /**
+     * @brief Command error interrupt
+     *
+     * Set: Asserted any time a radio command fails.
+     */
+    uint8_t commandError                        :1{0};
+
+    /**
+     * @brief Receive queue not empty
+     *
+     * Set: A packet was received and is waiting in the receive queue
+     */
+    uint8_t rxQueueNotEmpty                     :1{0};
+
+    /**
+     * @brief Packet transmitted
+     *
+     * Set: A packet was successfully transmitted
+     */
+    uint8_t txPacket                            :1{0};
+
+    /**
+     * @brief Transmit queue empty
+     *
+     * Set: The last pending packet has been transmitted
+     */
+    uint8_t txQueueEmpty                        :1{0};
+
+    uint8_t reserved                            :4{};
+} __attribute__((packed));
 }
 
 /**
@@ -432,6 +478,13 @@ struct BeaconConfig {
      */
     uint8_t data[];
 } __attribute__((packed));
+
+/**
+ * @brief "IrqStatus" write command
+ *
+ * This is used to clear pending interrupts, and thus release the interrupt line state.
+ */
+using IrqStatus = Response::IrqStatus;
 }
 }
 

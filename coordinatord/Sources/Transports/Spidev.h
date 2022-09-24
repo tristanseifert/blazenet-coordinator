@@ -28,7 +28,7 @@ class Spidev: public TransportBase {
          * This is the time period that we'll delay after transmitting the command header, but
          * before receiving the response for a "read" command.
          */
-        constexpr static const size_t kReadCmdDelay{25};
+        constexpr static const size_t kReadCmdDelay{30};
 
         /**
          * @brief Write command delay (µS)
@@ -36,7 +36,7 @@ class Spidev: public TransportBase {
          * This is the time period that we'll delay after transmitting the command header, but
          * before sending the payload for "write" commands.
          */
-        constexpr static const size_t kWriteCmdDelay{10};
+        constexpr static const size_t kWriteCmdDelay{30};
 
         /**
          * @brief Post-command delay (µS)
@@ -44,7 +44,7 @@ class Spidev: public TransportBase {
          * A delay period that's inserted after all commands, to allow for turnaround time in the
          * software.
          */
-        constexpr static const size_t kPostCmdDelay{25};
+        constexpr static const size_t kPostCmdDelay{50};
 
     public:
         Spidev(const toml::table &config);

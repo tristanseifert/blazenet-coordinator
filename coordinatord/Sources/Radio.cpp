@@ -19,22 +19,13 @@
  * configuration.
  */
 Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : transport(_transport) {
-    /*
-     * Do initial setup: register an irq handler and reset the radio.
-     */
+    // start by resetting the radio and installing our irq handler
     this->transport->reset();
 
     this->transport->addIrqHandler([&](){
         this->irqHandler();
     });
-
-    Transports::Request::IrqConfig irqConf{};
-    irqConf.rxQueueNotEmpty = true;
-    irqConf.txQueueEmpty = true;
-
-    this->setIrqConfig(irqConf);
-
-    this->initCounterReader();
+    this->initWatchdog();
 
     /*
      * Read out general information about the radio, to ensure that we can successfully
@@ -59,6 +50,17 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
     this->maxTxPower = this->currentTxPower = info.radio.maxTxPower;
 
     /*
+     * Do initial setup: configure interrupts and set up performance counter stuff
+     */
+    Transports::Request::IrqConfig irqConf{};
+    irqConf.rxQueueNotEmpty = true;
+    irqConf.txQueueEmpty = true;
+
+    this->setIrqConfig(irqConf);
+
+    this->initCounterReader();
+
+    /*
      * Then, configure the radio for operation by setting configuration that won't change for
      * the duration of its operation, such as the regulatory domain.
      *
@@ -79,6 +81,11 @@ Radio::~Radio() {
         event_del(this->counterReader);
         event_free(this->counterReader);
     }
+
+    if(this->irqWatchdog) {
+        event_del(this->irqWatchdog);
+        event_free(this->irqWatchdog);
+    }
 }
 
 
@@ -90,8 +97,6 @@ Radio::~Radio() {
  * we have stored.
  */
 void Radio::uploadConfig() {
-    Transports::Response::GetStatus status;
-
     // build the command
     Transports::Request::RadioConfig conf{};
 
@@ -104,11 +109,7 @@ void Radio::uploadConfig() {
             {reinterpret_cast<std::byte *>(&conf), sizeof(conf)});
 
     // check that the packet was queued (error flag not set)
-    this->queryStatus(status);
-    if(!status.cmdSuccess) {
-        throw std::runtime_error("failed to set radio config");
-    }
-
+    this->ensureCmdSuccess("RadioConfig");
     this->isConfigDirty = false;
 }
 
@@ -181,8 +182,6 @@ void Radio::transmitPacket(const std::unique_ptr<TxPacket> &packet) {
  */
 void Radio::setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
         std::span<const std::byte> payload, const bool updateConfig) {
-    Transports::Response::GetStatus status{};
-
     // validate inputs
     if(interval.count() < kMinBeaconInterval) {
         throw std::invalid_argument(fmt::format("interval too small (min {} msec)",
@@ -214,10 +213,7 @@ void Radio::setBeaconConfig(const bool enabled, const std::chrono::milliseconds 
     this->transport->sendCommandWithPayload(Transports::CommandId::BeaconConfig, buf);
 
     // check for success
-    this->queryStatus(status);
-    if(!status.cmdSuccess) {
-        throw std::runtime_error("radio reported error from updating beacon config");
-    }
+    this->ensureCmdSuccess("BeaconConfig");
 }
 
 
@@ -298,7 +294,6 @@ void Radio::counterReaderFired() {
  * read is completed.
  */
 void Radio::queryCounters() {
-    Transports::Response::GetStatus status{};
     Transports::Response::GetCounters counters{};
 
     // read out the counters
@@ -306,10 +301,7 @@ void Radio::queryCounters() {
             {reinterpret_cast<std::byte *>(&counters), sizeof(counters)});
 
     // check for success
-    this->queryStatus(status);
-    if(!status.cmdSuccess) {
-        throw std::runtime_error("radio reported error reading performance counters");
-    }
+    this->ensureCmdSuccess("GetCounters");
 
     // process transmit counters
     PLOG_VERBOSE << fmt::format("tx: pending={}, alloc={} bytes", counters.txQueue.packetsPending,
@@ -339,48 +331,117 @@ void Radio::queryCounters() {
 
 
 /**
+ * @brief Interrupt watchdog
+ *
+ * This is a periodic timer that checks when the last interrupt was received from the radio, and if
+ * it has been too long, manually invokes the handler. This guards against interrupt pulses getting
+ * lost.
+ */
+void Radio::initWatchdog() {
+    auto evbase = Support::EventLoop::Current()->getEvBase();
+
+    this->irqWatchdog = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
+        reinterpret_cast<Radio *>(ctx)->irqWatchdogFired();
+    }, this);
+    if(!this->irqWatchdog) {
+        throw std::runtime_error("failed to allocate irq watchdog event");
+    }
+
+    // set the interval
+    constexpr static const auto usec = (kIrqWatchdogInterval * 1000);
+    struct timeval tv{
+        .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
+        .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
+    };
+
+    evtimer_add(this->irqWatchdog, &tv);
+}
+
+/**
+ * @brief Handle the irq watchdog firing
+ *
+ * If the last irq was long enough ago, manually query the irq status.
+ */
+void Radio::irqWatchdogFired() {
+    Transports::Response::IrqStatus irq{};
+
+    // ignore if we haven't had any irq's yet
+    if(!this->irqCounter) {
+        return;
+    }
+
+    const auto now = std::chrono::high_resolution_clock::now();
+    double msec = std::chrono::duration_cast<std::chrono::milliseconds>(now - this->lastIrq).count();
+
+    if(msec > kIrqWatchdogThreshold) {
+        std::lock_guard lg(this->transportLock);
+        this->getPendingInterrupts(irq);
+
+        if(*((uint8_t *) &irq)) {
+            // TODO: accounting for lost interrupts
+            PLOG_WARNING << fmt::format("Lost IRQ: 0b{:08b}", *((uint8_t *) &irq));
+        }
+
+        this->irqHandlerCommon(irq);
+    }
+}
+
+/**
  * @brief Interrupt handler
  *
  * This is invoked by the underlying transport when it detects that the controller has asserted its
  * interrupt line.
  */
 void Radio::irqHandler() {
-    bool checkAgain;
-    Transports::Response::GetStatus status{};
+    Transports::Response::IrqStatus irq{};
+    this->irqCounter++;
 
+    // get the pending interrupts flag
     std::lock_guard lg(this->transportLock);
 
-    // read status until we've serviced everything that needs servicing
-    do {
-        this->queryStatus(status);
-        checkAgain = false;
+    this->getPendingInterrupts(irq);
+    PLOG_INFO << fmt::format("IRQ: 0b{:08b}", *((uint8_t *) &irq));
 
-        PLOG_DEBUG << fmt::format("status register: 0b{:08b}", *((uint8_t *) &status));
-
-        // read a packet
-        if(status.rxQueueNotEmpty) {
-            this->readPacket();
-            checkAgain = true;
-        }
-        if(status.rxQueueOverflow) {
-            // TODO: reset overflow flag
-            // checkAgain = true;
-        }
-
-        // transmit queue is empty
-        if(status.txQueueEmpty) {
-            checkAgain = this->drainTxQueue();
-        }
-    } while(checkAgain);
+    this->irqHandlerCommon(irq);
 }
+
+/**
+ * @brief Interrupt handler core
+ */
+void Radio::irqHandlerCommon(const Transports::Response::IrqStatus &irq) {
+    try {
+        // process the interrupt sources
+        if(irq.rxQueueNotEmpty) {
+            bool keepReading{true};
+
+            // read packets until there's no more
+            while(keepReading) {
+                this->readPacket(keepReading);
+            }
+        }
+        if(irq.txQueueEmpty) {
+            this->drainTxQueue();
+        }
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Radio irq handler failed: " << e.what();
+        // TODO: better handling of errors here (this will abort the program)
+        throw;
+    }
+
+    // update irq timestamp
+    this->lastIrq = std::chrono::high_resolution_clock::now();
+}
+#include <sstream>
 
 /**
  * @brief Read a pending packet.
  *
  * Check the packet queue status, and read out a packet from the queue. The packet is then
  * submitted to the upper layer packet handler.
+ *
+ * @param outRead Set when a packet was actually read out
  */
-void Radio::readPacket() {
+void Radio::readPacket(bool &outRead) {
     Transports::Response::GetPacketQueueStatus status{};
     Transports::Response::ReadPacket packet{};
     std::vector<std::byte> packetData;
@@ -388,7 +449,8 @@ void Radio::readPacket() {
     // read packet queue status
     this->queryPacketQueueStatus(status);
     if(!status.rxPacketPending) {
-        throw std::runtime_error("no rx packet pending!");
+        outRead = false;
+        return;
     }
 
     PLOG_VERBOSE << fmt::format("rx packet pending: {} bytes", status.rxPacketSize);
@@ -469,17 +531,12 @@ void Radio::queryStatus(Transports::Response::GetStatus &outStatus) {
  * @param config Interrupt configuration to apply
  */
 void Radio::setIrqConfig(const Transports::Request::IrqConfig &config) {
-    Transports::Response::GetStatus status{};
-
     // execute request
     this->transport->sendCommandWithPayload(Transports::CommandId::IrqConfig,
             {reinterpret_cast<const std::byte *>(&config), sizeof(config)});
 
     // check for success
-    this->queryStatus(status);
-    if(!status.cmdSuccess) {
-        throw std::runtime_error("radio reported error setting irq config");
-    }
+    this->ensureCmdSuccess("IrqConfig");
 }
 
 /**
@@ -500,17 +557,12 @@ void Radio::queryPacketQueueStatus(Transports::Response::GetPacketQueueStatus &o
  */
 void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
         std::span<std::byte> payloadBuf) {
-    Transports::Response::GetStatus status{};
-
     // prepare our receive buffer, then do request
     this->rxBuffer.resize(sizeof(outHeader) + payloadBuf.size());
     this->transport->sendCommandWithResponse(Transports::CommandId::ReadPacket, this->rxBuffer);
 
     // check for success
-    this->queryStatus(status);
-    if(!status.cmdSuccess) {
-        throw std::runtime_error("radio reported error from reading packet");
-    }
+    this->ensureCmdSuccess("ReadPacket");
 
     // copy out data
     auto header = reinterpret_cast<const Transports::Response::ReadPacket*>(this->rxBuffer.data());
@@ -531,8 +583,6 @@ void Radio::readPacket(Transports::Response::ReadPacket &outHeader,
  */
 void Radio::transmitPacket(const Transports::Request::TransmitPacket &header,
         std::span<const std::byte> payload) {
-    Transports::Response::GetStatus status{};
-
     // prepare the transmit buffer
     this->txBuffer.resize(sizeof(header) + payload.size());
     memcpy(this->txBuffer.data(), &header, sizeof(header));
@@ -542,8 +592,45 @@ void Radio::transmitPacket(const Transports::Request::TransmitPacket &header,
     this->transport->sendCommandWithPayload(Transports::CommandId::TransmitPacket, this->txBuffer);
 
     // check that the packet was queued (error flag not set)
+    this->ensureCmdSuccess("TransmitPacket");
+}
+
+/**
+ * @brief Read the interrupt status register
+ *
+ * @param outIrqs Variable to receive the currently pending interrupts
+ */
+void Radio::getPendingInterrupts(Transports::Response::IrqStatus &outIrqs) {
+    this->transport->sendCommandWithResponse(Transports::CommandId::IrqStatus,
+            {reinterpret_cast<std::byte *>(&outIrqs), sizeof(outIrqs)});
+    this->ensureCmdSuccess("Read IrqStatus");
+}
+
+/**
+ * @brief Acknowledge pending interrupts
+ *
+ * @param irqs Interrupts to acknowledge
+ */
+void Radio::acknowledgeInterrupts(const Transports::Request::IrqStatus &irqs) {
+    this->transport->sendCommandWithPayload(Transports::CommandId::IrqStatus,
+            {reinterpret_cast<const std::byte *>(&irqs), sizeof(irqs)});
+    this->ensureCmdSuccess("Write IrqStatus");
+}
+
+
+
+/**
+ * @brief Read s tatus register and ensure last command succeeded
+ *
+ * If the command success flag is not set (e.g. the last command failed) we'll throw an exception.
+ *
+ * @param commandName Optional name of the command that was last executed
+ */
+void Radio::ensureCmdSuccess(const std::string_view commandName) {
+    Transports::Response::GetStatus status{};
+
     this->queryStatus(status);
     if(!status.cmdSuccess) {
-        throw std::runtime_error("radio reported error on queuing packet");
+        throw std::runtime_error(fmt::format("command failed: {}", commandName));
     }
 }
