@@ -102,6 +102,18 @@ class Indicators {
         }
 
         /**
+         * @brief Turn off the attention indicator
+         */
+        static inline void TurnOffAttention() {
+            SetChannelScript(Indicator::Attention, gAnimTurnOff, true);
+        }
+        /**
+         * @brief Blink the attention indicator (fast)
+         */
+        static inline void BlinkAttentionFast() {
+            SetChannelScript(Indicator::Attention, gAnimAttentionBlinkFast, true);
+        }
+        /**
          * @brief Blink the attention indicator (slow)
          */
         static inline void BlinkAttentionSlow() {
@@ -162,6 +174,12 @@ class Indicators {
         /// Secrete logs when channels are processed
         constexpr static const bool kLogChannelUpdates{false};
 
+        /// Turns off an indicator immediately
+        constexpr static const etl::array<const uint8_t, 2> gAnimTurnOff{{
+            AnimCommand::TurnOff,
+            AnimCommand::End,
+        }};
+
         /// Blink an indicator briefly
         constexpr static const etl::array<const uint8_t, 7> gAnimShortBlink{{
             AnimCommand::TurnOn,
@@ -171,6 +189,14 @@ class Indicators {
             AnimCommand::End,
         }};
 
+        /// Repeatedly blink the indicator, with a .5Hz repetition rate
+        constexpr static const etl::array<const uint8_t, 7> gAnimAttentionBlinkFast{{
+            AnimCommand::TurnOn,
+            AnimCommand::Delay, pdMS_TO_TICKS(500),
+            AnimCommand::TurnOff,
+            AnimCommand::Delay, pdMS_TO_TICKS(500),
+            AnimCommand::Restart,
+        }};
         /// Repeatedly blink the indicator, with a 1Hz repetition rate
         constexpr static const etl::array<const uint8_t, 7> gAnimAttentionBlinkSlow{{
             AnimCommand::TurnOn,

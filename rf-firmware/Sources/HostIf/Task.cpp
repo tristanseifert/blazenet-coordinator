@@ -7,6 +7,7 @@
 
 #include "Commands.h"
 #include "IrqManager.h"
+#include "Watchdog.h"
 #include "Task.h"
 
 using namespace HostIf;
@@ -24,13 +25,17 @@ bool Task::gErrorFlag{false};
  * @brief Initialize the host interface task
  */
 void Task::Init() {
-    static StaticTask_t gStorage;
+    static StaticTask_t gTaskStorage;
     static StackType_t gStack[kStackSize];
 
+    // create the task
     gTask = xTaskCreateStatic([](auto param) {
         Task::Main();
-    }, kName.data(), kStackSize, nullptr, kPriority, gStack, &gStorage);
+    }, kName.data(), kStackSize, nullptr, kPriority, gStack, &gTaskStorage);
     REQUIRE(!!gTask, "failed to initialize %s", "host i/f task");
+
+    // set up comms watchdog
+    Watchdog::Init();
 }
 
 /**
@@ -63,6 +68,9 @@ void Task::Main() {
                 Logger::Warning("Cmd not valid!");
                 ReadCommand();
             }
+
+            // update comms state
+            Watchdog::Kick();
         }
         // finished receiving command payload
         if(note & TaskNotifyBits::PayloadReceiveComplete) {
