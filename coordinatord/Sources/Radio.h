@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -81,6 +82,60 @@ class Radio {
             NumLevels,
         };
 
+        /**
+         * @brief Transmit performance counters
+         */
+        struct TxCounters {
+            /// Pckets discarded due to insufficient buffer space
+            uint_least64_t bufferDiscards{0};
+            /// Packets discarded due to allocation failures
+            uint_least64_t allocDiscards{0};
+            /// Packets discarded due to insufficient queue space
+            uint_least64_t queueDiscards{0};
+
+            /// Drops due to FIFO underruns
+            uint_least64_t fifoDrops{0};
+            /// Packets discarded because radio could not get clear channel
+            uint_least64_t ccaFails{0};
+            /// Number of successfully transmitted frames
+            uint_least64_t goodFrames{0};
+
+            /**
+             * @brief Reset all counters
+             */
+            inline void reset() {
+                this->bufferDiscards = this->allocDiscards = this->queueDiscards = 0;
+                this->fifoDrops = this->ccaFails = this->goodFrames = 0;
+            }
+        };
+
+        /**
+         * @brief Receive performance counters
+         */
+        struct RxCounters {
+            /// Packets discarded due to insufficient buffer space
+            uint_least64_t bufferDiscards{0};
+            /// Packets discarded due to allocation failures
+            uint_least64_t allocDiscards{0};
+            /// Packets discarded due to insufficient queue space
+            uint_least64_t queueDiscards{0};
+
+            /// FIFO overruns
+            uint_least64_t fifoOverflows{0};
+            /// Packets discarded due to framing errors
+            uint_least64_t frameErrors{0};
+            /// Number of successfully received frames
+            uint_least64_t goodFrames{0};
+
+            /**
+             * @brief Reset all counters
+             */
+            inline void reset() {
+                this->bufferDiscards = this->allocDiscards = this->queueDiscards = 0;
+                this->fifoOverflows = this->frameErrors = this->goodFrames = 0;
+            }
+        };
+
     private:
         /**
          * @brief Structure representing a packet pending transmission
@@ -105,6 +160,8 @@ class Radio {
 
         /// Minimum beacon interval (msec)
         constexpr static const size_t kMinBeaconInterval{1'000};
+        /// Performance counter read interval (sec)
+        constexpr static const size_t kPerfCounterReadInterval{30};
 
     public:
         Radio(const std::shared_ptr<Transports::TransportBase> &transport);
@@ -172,10 +229,29 @@ class Radio {
             this->setBeaconConfig(false, 0ms, payload, false);
         }
 
+        void resetCounters(const bool remote = false);
+
+        /**
+         * @brief Get receive performance counters
+         */
+        inline const auto &getRxCounters() const {
+            return this->rxCounters;
+        }
+        /**
+         * @brief Get transmit performance counters
+         */
+        inline const auto &getTxCounters() const {
+            return this->txCounters;
+        }
+
     private:
         void transmitPacket(const std::unique_ptr<TxPacket> &);
         void setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
                 std::span<const std::byte> payload, const bool updateConfig);
+
+        void initCounterReader();
+        void counterReaderFired();
+        void queryCounters();
 
         void irqHandler();
         void readPacket();
@@ -219,6 +295,13 @@ class Radio {
         uint16_t maxTxPower;
         /// Current transmit power
         uint16_t currentTxPower;
+
+        /// Periodic event to read out the performance counters
+        struct event *counterReader{nullptr};
+        /// TX performance counters
+        TxCounters txCounters{};
+        /// RX performance counters
+        RxCounters rxCounters{};
 };
 
 #endif

@@ -2,8 +2,10 @@
 #include <cstring>
 #include <functional>
 #include <stdexcept>
+#include <event2/event.h>
 #include <fmt/format.h>
 
+#include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Transports/Base.h"
 #include "Transports/Commands.h"
@@ -31,6 +33,8 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
     irqConf.txQueueEmpty = true;
 
     this->setIrqConfig(irqConf);
+
+    this->initCounterReader();
 
     /*
      * Read out general information about the radio, to ensure that we can successfully
@@ -70,7 +74,11 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
  * Notify the radio that we're going away, then tear down all resources associated with the radio.
  */
 Radio::~Radio() {
-
+    // stop performance counter reading in the background
+    if(this->counterReader) {
+        event_del(this->counterReader);
+        event_free(this->counterReader);
+    }
 }
 
 
@@ -210,6 +218,122 @@ void Radio::setBeaconConfig(const bool enabled, const std::chrono::milliseconds 
     if(!status.cmdSuccess) {
         throw std::runtime_error("radio reported error from updating beacon config");
     }
+}
+
+
+
+/**
+ * @brief Reset performance counters
+ *
+ * Clear the local copies of the performance counters, and perform a dummy read of the counters
+ * from the radio to clear them as well.
+ *
+ * @param remote When set, the radio's counters are cleared as well
+ */
+void Radio::resetCounters(const bool remote) {
+    // clear the radio's counters by reading them out, if requested
+    if(remote) {
+        std::lock_guard lg(this->transportLock);
+        this->queryCounters();
+    }
+
+    // clear local counter values
+    this->rxCounters.reset();
+    this->txCounters.reset();
+}
+
+/**
+ * @brief Initialize the performance counter reading timer
+ *
+ * This will periodically query the device's performance counters in the background, to keep them
+ * from overflowing.
+ *
+ * @seeAlso counterReaderFired
+ */
+void Radio::initCounterReader() {
+    auto evbase = Support::EventLoop::Current()->getEvBase();
+    this->counterReader = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
+        reinterpret_cast<Radio *>(ctx)->counterReaderFired();
+    }, this);
+    if(!this->counterReader) {
+        throw std::runtime_error("failed to allocate performance counter reading event");
+    }
+
+    // set the interval
+    struct timeval tv{
+        .tv_sec  = static_cast<time_t>(kPerfCounterReadInterval),
+        .tv_usec = static_cast<suseconds_t>(0),
+    };
+
+    evtimer_add(this->counterReader, &tv);
+}
+
+/**
+ * @brief Handle background reading of performance counters
+ *
+ * Triggered by a periodic timer to read the performance counters.
+ *
+ * @seeAlso initCounterReader
+ */
+void Radio::counterReaderFired() {
+    {
+        std::lock_guard lg(this->transportLock);
+        this->queryCounters();
+    }
+
+    PLOG_VERBOSE << fmt::format("rx: fifo={},frame={} ok={}; queue buf={},alloc={},queue={}",
+            this->rxCounters.fifoOverflows, this->rxCounters.frameErrors,
+            this->rxCounters.goodFrames, this->rxCounters.bufferDiscards,
+            this->rxCounters.allocDiscards, this->rxCounters.queueDiscards);
+    PLOG_VERBOSE << fmt::format("tx: fifo={},csma={} ok={}; queue buf={},alloc={},queue={}",
+            this->txCounters.fifoDrops, this->txCounters.ccaFails, this->txCounters.goodFrames,
+            this->txCounters.bufferDiscards, this->txCounters.allocDiscards,
+            this->txCounters.queueDiscards);
+}
+
+/**
+ * @brief Read performance counters
+ *
+ * Query the radio for the current values of its performance counters. These are reset after the
+ * read is completed.
+ */
+void Radio::queryCounters() {
+    Transports::Response::GetStatus status{};
+    Transports::Response::GetCounters counters{};
+
+    // read out the counters
+    this->transport->sendCommandWithResponse(Transports::CommandId::GetCounters,
+            {reinterpret_cast<std::byte *>(&counters), sizeof(counters)});
+
+    // check for success
+    this->queryStatus(status);
+    if(!status.cmdSuccess) {
+        throw std::runtime_error("radio reported error reading performance counters");
+    }
+
+    // process transmit counters
+    PLOG_VERBOSE << fmt::format("tx: pending={}, alloc={} bytes", counters.txQueue.packetsPending,
+            counters.txQueue.bufferSize);
+
+    this->txCounters.bufferDiscards += counters.txQueue.bufferDiscards;
+    this->txCounters.allocDiscards += counters.txQueue.bufferAllocFails;
+    this->txCounters.queueDiscards += counters.txQueue.queueDiscards;
+
+    this->txCounters.fifoDrops += counters.txRadio.fifoDrops;
+    this->txCounters.ccaFails += counters.txRadio.ccaFails;
+    this->txCounters.goodFrames += counters.txRadio.goodFrames;
+
+    // process receive counters
+    PLOG_VERBOSE << fmt::format("rx: pending={}, alloc={} bytes", counters.rxQueue.packetsPending,
+            counters.rxQueue.bufferSize);
+
+    this->rxCounters.bufferDiscards += counters.rxQueue.bufferDiscards;
+    this->rxCounters.allocDiscards += counters.rxQueue.bufferAllocFails;
+    this->rxCounters.queueDiscards += counters.rxQueue.queueDiscards;
+
+    this->rxCounters.fifoOverflows += counters.rxRadio.fifoOverflows;
+    this->rxCounters.frameErrors += counters.rxRadio.frameErrors;
+    this->rxCounters.goodFrames += counters.rxRadio.goodFrames;
 }
 
 

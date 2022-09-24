@@ -107,6 +107,16 @@ enum class CommandId: uint8_t {
      * Writes are supported.
      */
     BeaconConfig                                = 0x08,
+
+    /**
+     * @brief Get performance counters
+     *
+     * Get the current values of performance counters, and reset them. It's expected the host will
+     * accumulate the counters with higher precision (64 bits) every time they are read.
+     *
+     * Reads are supported.
+     */
+    GetCounters                                 = 0x09,
 };
 
 /**
@@ -275,6 +285,65 @@ struct ReadPacket {
 
     /// Actual payload data
     uint8_t payload[];
+} __attribute__((packed));
+
+/**
+ * @brief "GetCounters" command response
+ *
+ * Reads out various performance counters to the host. If this command completes successfully, the
+ * counters will be cleared to zero.
+ */
+struct GetCounters {
+    /// Current internal tick timestamp
+    uint32_t currentTicks;
+
+    /// Transmit queue
+    struct {
+        /// Current number of packets pending
+        uint32_t packetsPending;
+        /// Number of bytes currently allocated
+        uint32_t bufferSize;
+
+        /// Packets discarded because buffer size limit was reached
+        uint32_t bufferDiscards;
+        /// Packets discarded because allocation failed (other reason)
+        uint32_t bufferAllocFails;
+        /// Packets discarded because queue is full
+        uint32_t queueDiscards;
+    } txQueue;
+    /// Radio (transmit)
+    struct {
+        /// Drops because FIFO is full
+        uint32_t fifoDrops;
+        /// CSMA detection fails
+        uint32_t ccaFails;
+        /// Number of successfully transmitted frames
+        uint32_t goodFrames;
+    } txRadio;
+
+    /// Receive queue
+    struct {
+        /// Current number of packets pending
+        uint32_t packetsPending;
+        /// Number of bytes currently allocated
+        uint32_t bufferSize;
+
+        /// Packets discarded because buffer size limit was reached
+        uint32_t bufferDiscards;
+        /// Packets discarded because allocation failed (other reason)
+        uint32_t bufferAllocFails;
+        /// Packets discarded because queue is full
+        uint32_t queueDiscards;
+    } rxQueue;
+    /// Radio (receive)
+    struct {
+        /// FIFO overflows
+        uint32_t fifoOverflows;
+        /// Frame errors
+        uint32_t frameErrors;
+        /// Number of good frames
+        uint32_t goodFrames;
+    } rxRadio;
 } __attribute__((packed));
 }
 
