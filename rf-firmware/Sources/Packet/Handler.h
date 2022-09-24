@@ -5,9 +5,8 @@
 #include <stdint.h>
 
 #include <etl/array.h>
-#include <etl/intrusive_links.h>
-#include <etl/intrusive_queue.h>
 #include <etl/queue.h>
+#include <etl/span.h>
 
 namespace Packet {
 /**
@@ -100,6 +99,16 @@ class Handler {
             uint16_t packetSize{};
 
             /**
+             * @brief Don't deallocate packet when discarding
+             *
+             * When set, the packet will _not_ be deallocated when it's being discarded after being
+             * transmitted. This is useful for stuff like beacon frames and other periodic packets.
+             */
+            uint8_t isSticky                    :1{0};
+            /// Flags that aren't assigned yet
+            uint8_t reserved                    :7{0};
+
+            /**
              * @brief Number of times CSMA failed for this packet
              *
              * This counter contains the number of times the packet could not be sent due to CSMA
@@ -162,9 +171,10 @@ class Handler {
     public:
         static void Init();
 
+        static int EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet);
         static TxPacketBuffer *EneuqueTxPacket(const TxPacketPriority priority,
-                etl::span<const uint8_t> payload);
-        static void DiscardTxPacket(TxPacketBuffer *);
+                etl::span<const uint8_t> payload, const bool isSticky = false);
+        static void DiscardTxPacket(TxPacketBuffer *, const bool force = false);
 
         static RxPacketBuffer *EnqueueRxPacket(const struct RAIL_RxPacketInfo &,
                 const struct RAIL_RxPacketDetails &);
@@ -260,6 +270,8 @@ class Handler {
     private:
         static void UpdateRxQueueState();
         static void UpdateTxQueueState();
+
+        static int SubmitTxPacket(TxQueueType *, TxPacketBuffer *);
 
     private:
         /// Rx queue overflow flag (sticky)

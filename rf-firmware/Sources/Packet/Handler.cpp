@@ -131,14 +131,47 @@ void Handler::UpdateRxQueueState() {
 
 
 /**
+ * @brief Enqueue a pre-allocated packet
+ *
+ * Add a previously queued packet (which was declared sticky) to the transmit queue
+ *
+ * @param priority Queue to insert the packet into
+ * @param packet Packet to add to the queue
+ *
+ * @return 0 on success or negative error code
+ */
+int Handler::EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet) {
+    // ensure the appropriate queue has space
+    auto queue = gTxQueues[static_cast<size_t>(priority)];
+    if(queue->full()) {
+        gTxOverflowFlag = true;
+        gTxQueueDiscarded++;
+        UpdateTxQueueState();
+
+        if(kLogTxRejects) {
+            Logger::Warning("TX queue %u full!", static_cast<size_t>(priority));
+        }
+
+        return -1;
+    }
+
+    // insert it boiiii
+    return SubmitTxPacket(queue, packet);
+}
+
+/**
  * @brief Queue a packet for transmission
  *
  * Insert the packet into our internal transmit queue.
  *
  * If no packets are currently pending, we'll immediately request transmission.
+ *
+ * @param priority Queue to insert the packet into
+ * @param payload Packet payload
+ * @param isSticky Whether the packet buffer is sticky (reusable)
  */
 Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priority,
-        etl::span<const uint8_t> payload) {
+        etl::span<const uint8_t> payload, const bool isSticky) {
     int err;
 
     // ensure the appropriate queue has space
@@ -182,33 +215,56 @@ Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priorit
 
     gTxAllocBytes += requiredBytes;
 
+    new (buffer) TxPacketBuffer();
+
     // fill in the packet structure
     buffer->packetSize = payload.size();
+    buffer->isSticky = isSticky;
+
     memcpy(buffer->data, payload.data(), payload.size());
+
+    // either enqueue packet or transmit it
+    err = SubmitTxPacket(queue, buffer);
+    if(err) {
+        Logger::Warning("%s failed: %d", "EnqueueTxPacket", err);
+
+        // clean up resources
+        DiscardTxPacket(buffer, true);
+        return nullptr;
+    }
+
+    return buffer;
+}
+
+/**
+ * @brief Enqueue the specified packet
+ *
+ * This is the common "footer" to all transmit packet submission functions.
+ *
+ * @param queue Queue to add the packet to
+ * @param buffer Packet to enqueue
+ *
+ * @return 0 on success or a negative error code
+ */
+int Handler::SubmitTxPacket(TxQueueType *queue, TxPacketBuffer *buffer) {
+    int err{0};
 
     // if there are no packets pending, skip the queue and transmit it right away
     if(!gTxPacketsPending++) {
         err = Radio::Task::TxPacketImmediate(buffer);
-        if(err) {
-            Logger::Warning("%s failed: %d", "TxPacketImmediate", err);
-
-            // clean up resources
-            DiscardTxPacket(buffer);
-            return nullptr;
-        }
     }
     // otherwise, insert into appropriate queue
     else {
         queue->emplace(buffer);
 
         if(kLogTx) {
-            Logger::Trace("%s: queue%u %u/%u (%p)", "tx", static_cast<size_t>(priority),
-                    queue->available(), queue->capacity(), buffer);
+            Logger::Trace("%s: queue%u %u/%u", "tx", queue->available(), queue->capacity(),
+                    buffer);
         }
     }
 
     UpdateTxQueueState();
-    return buffer;
+    return err;
 }
 
 /**
@@ -217,15 +273,20 @@ Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priorit
  * Invoke this once the packet has been transmitted, to release its associated resources.
  *
  * @param packet Packet to be released
+ * @param force When set, the packet is deallocated even if it's sticky
  */
-void Handler::DiscardTxPacket(TxPacketBuffer *buffer) {
-    const auto numBytes = sizeof(*buffer) + buffer->packetSize;
+void Handler::DiscardTxPacket(TxPacketBuffer *buffer, const bool force) {
+    // free the packet if it's not sticky
+    if(!buffer->isSticky || force) {
+        const auto numBytes = sizeof(*buffer) + buffer->packetSize;
 
-    free(buffer);
+        free(buffer);
 
-    gTxAllocBytes -= numBytes;
+        gTxAllocBytes -= numBytes;
+    }
+
+    // update generic bookkeeping
     --gTxPacketsPending;
-
     UpdateTxQueueState();
 }
 
