@@ -158,7 +158,7 @@ void Task::ReadPacket() {
     }
 
     // enqueue the packet (it will be copied)
-    Packet::Handler::EnqueueRxPacket(info, details);
+    Packet::Handler::HandleRxPacket(info, details);
     gRxFrames++;
 
 /*

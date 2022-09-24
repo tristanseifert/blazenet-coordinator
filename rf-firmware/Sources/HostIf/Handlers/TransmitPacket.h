@@ -47,7 +47,7 @@ struct TransmitPacket {
                 break;
         }
 
-        auto packet = Packet::Handler::EneuqueTxPacket(pri, {req->data, packetPayloadBytes});
+        auto packet = Packet::Handler::QueueTxPacket(pri, {req->data, packetPayloadBytes});
         return (packet == nullptr) ? -2 : 0;
     }
 };

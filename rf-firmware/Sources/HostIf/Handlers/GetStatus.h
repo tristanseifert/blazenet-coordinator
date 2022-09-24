@@ -27,7 +27,7 @@ struct GetStatus {
         Response::GetStatus temp;
 
         // error flag
-        temp.errorFlag = Task::gErrorFlag;
+        temp.cmdSuccess = !Task::gErrorFlag;
         Task::gErrorFlag = false;
 
         // radio active

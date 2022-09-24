@@ -97,8 +97,8 @@ struct GetInfo {
  * This is basically one gigantic bitfield of event flags.
  */
 struct GetStatus {
-    /// Last command resulted in error
-    uint8_t errorFlag                           :1;
+    /// Last command was successful
+    uint8_t cmdSuccess                          :1;
     /// Radio is active (tuned to channel and receiving or transmitting)
     uint8_t radioActive                         :1;
 

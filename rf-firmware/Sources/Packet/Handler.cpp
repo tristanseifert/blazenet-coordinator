@@ -42,7 +42,7 @@ void Handler::Init() {
  *
  * @TODO make this thread safe
  */
-Handler::RxPacketBuffer *Handler::EnqueueRxPacket(const struct RAIL_RxPacketInfo &info,
+Handler::RxPacketBuffer *Handler::HandleRxPacket(const struct RAIL_RxPacketInfo &info,
         const struct RAIL_RxPacketDetails &details) {
     // ensure we've queue space
     if(gRxQueue->full()) {
@@ -140,7 +140,7 @@ void Handler::UpdateRxQueueState() {
  *
  * @return 0 on success or negative error code
  */
-int Handler::EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet) {
+int Handler::QueueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet) {
     // ensure the appropriate queue has space
     auto queue = gTxQueues[static_cast<size_t>(priority)];
     if(queue->full()) {
@@ -156,7 +156,61 @@ int Handler::EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *pa
     }
 
     // insert it boiiii
-    return SubmitTxPacket(queue, packet);
+    return QueueTxPacketFinal(queue, packet);
+}
+
+/**
+ * @brief Allocate a transmit packet buffer
+ *
+ * Given the specified payload, copy it into a packet buffer we've allocated.
+ *
+ * @param payload Packet payload
+ *
+ *
+ * @return Packet buffer structure, or `nullptr` on error
+ */
+Handler::TxPacketBuffer *Handler::AllocTxPacket(etl::span<const uint8_t> payload,
+        const bool isSticky) {
+    // calculate the size of the packet buffer structure, validate space vacancy
+    const auto requiredBytes = sizeof(TxPacketBuffer) + payload.size();
+
+    if((gTxAllocBytes + requiredBytes) > kMaxTxBufferSize) {
+        gTxOverflowFlag = true;
+        gTxBufferDiscarded++;
+        UpdateTxQueueState();
+
+        if(kLogTxRejects) {
+            Logger::Warning("%s: Buffer alloc overflow (%u alloc)", "tx", gTxAllocBytes);
+        }
+        return nullptr;
+    }
+
+    // allocate the buffer
+    auto buffer = reinterpret_cast<TxPacketBuffer *>(malloc(requiredBytes));
+    if(!buffer) {
+        gTxOverflowFlag = true;
+        gTxBufferAllocFailed++;
+        UpdateTxQueueState();
+
+        if(kLogTxRejects) {
+            Logger::Warning("%s: failed to alloc %u bytes", "tx", requiredBytes);
+        }
+        return nullptr;
+    }
+
+    // keep track of the allocation
+    gTxAllocBytes += requiredBytes;
+
+    // buffer was allocated, so initialize it with the payload
+    new (buffer) TxPacketBuffer();
+
+    buffer->packetSize = payload.size();
+    buffer->isSticky = isSticky;
+
+    memcpy(buffer->data, payload.data(), payload.size());
+
+    // success - the buffer was initialized fully
+    return buffer;
 }
 
 /**
@@ -170,7 +224,7 @@ int Handler::EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *pa
  * @param payload Packet payload
  * @param isSticky Whether the packet buffer is sticky (reusable)
  */
-Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priority,
+Handler::TxPacketBuffer *Handler::QueueTxPacket(const TxPacketPriority priority,
         etl::span<const uint8_t> payload, const bool isSticky) {
     int err;
 
@@ -187,44 +241,14 @@ Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priorit
         return nullptr;
     }
 
-    // calculate the size of the packet buffer structure, validate space vacancy and allocate
-    const auto requiredBytes = sizeof(TxPacketBuffer) + payload.size();
-
-    if((gTxAllocBytes + requiredBytes) > kMaxTxBufferSize) {
-        gTxOverflowFlag = true;
-        gTxBufferDiscarded++;
-        UpdateTxQueueState();
-
-        if(kLogTxRejects) {
-            Logger::Warning("%s: Buffer alloc overflow (%u alloc)", "tx", gTxAllocBytes);
-        }
-        return nullptr;
-    }
-
-    auto buffer = reinterpret_cast<TxPacketBuffer *>(malloc(requiredBytes));
+    // try to allocate the packet
+    auto buffer = AllocTxPacket(payload, isSticky);
     if(!buffer) {
-        gTxOverflowFlag = true;
-        gTxBufferAllocFailed++;
-        UpdateTxQueueState();
-
-        if(kLogTxRejects) {
-            Logger::Warning("%s: failed to alloc %u bytes", "tx", requiredBytes);
-        }
         return nullptr;
     }
-
-    gTxAllocBytes += requiredBytes;
-
-    new (buffer) TxPacketBuffer();
-
-    // fill in the packet structure
-    buffer->packetSize = payload.size();
-    buffer->isSticky = isSticky;
-
-    memcpy(buffer->data, payload.data(), payload.size());
 
     // either enqueue packet or transmit it
-    err = SubmitTxPacket(queue, buffer);
+    err = QueueTxPacketFinal(queue, buffer);
     if(err) {
         Logger::Warning("%s failed: %d", "EnqueueTxPacket", err);
 
@@ -246,7 +270,7 @@ Handler::TxPacketBuffer *Handler::EneuqueTxPacket(const TxPacketPriority priorit
  *
  * @return 0 on success or a negative error code
  */
-int Handler::SubmitTxPacket(TxQueueType *queue, TxPacketBuffer *buffer) {
+int Handler::QueueTxPacketFinal(TxQueueType *queue, TxPacketBuffer *buffer) {
     int err{0};
 
     // if there are no packets pending, skip the queue and transmit it right away

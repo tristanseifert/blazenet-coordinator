@@ -171,12 +171,14 @@ class Handler {
     public:
         static void Init();
 
-        static int EneuqueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet);
-        static TxPacketBuffer *EneuqueTxPacket(const TxPacketPriority priority,
+        static int QueueTxPacket(const TxPacketPriority priority, TxPacketBuffer *packet);
+        static TxPacketBuffer *AllocTxPacket(etl::span<const uint8_t> payload,
+                const bool isSticky = false);
+        static TxPacketBuffer *QueueTxPacket(const TxPacketPriority priority,
                 etl::span<const uint8_t> payload, const bool isSticky = false);
         static void DiscardTxPacket(TxPacketBuffer *, const bool force = false);
 
-        static RxPacketBuffer *EnqueueRxPacket(const struct RAIL_RxPacketInfo &,
+        static RxPacketBuffer *HandleRxPacket(const struct RAIL_RxPacketInfo &,
                 const struct RAIL_RxPacketDetails &);
         static void DiscardRxPacket(RxPacketBuffer *);
 
@@ -271,7 +273,7 @@ class Handler {
         static void UpdateRxQueueState();
         static void UpdateTxQueueState();
 
-        static int SubmitTxPacket(TxQueueType *, TxPacketBuffer *);
+        static int QueueTxPacketFinal(TxQueueType *, TxPacketBuffer *);
 
     private:
         /// Rx queue overflow flag (sticky)
