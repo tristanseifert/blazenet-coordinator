@@ -20,6 +20,20 @@
 #include "Transports/Spidev.h"
 
 using namespace Transports;
+using namespace std::chrono_literals;
+
+/**
+ * @brief Write command post delays
+ *
+ * Indicates how long to wait after a particular write command for proper functioning of the
+ * firmware. If a command ID is absent from this map, it does not require any additional delay
+ * after the command is complete.
+ */
+const std::unordered_map<CommandId, std::chrono::microseconds> Spidev::gWriteDelays{
+    { CommandId::TransmitPacket,         50us },
+    { CommandId::BeaconConfig,          250us },
+};
+
 
 /**
  * @brief Initialize the SPI transport
@@ -354,6 +368,11 @@ void Spidev::sendCommandWithPayload(const CommandId command, std::span<const std
     err = ioctl(this->spidev, SPI_IOC_MESSAGE(payload.empty() ? 1 : 2), transfers.data());
     if(err == -1) {
         throw std::system_error(errno, std::generic_category(), __func__);
+    }
+
+    // post delay
+    if(gWriteDelays.contains(command)) {
+        usleep(gWriteDelays.at(command).count());
     }
 }
 

@@ -1,10 +1,12 @@
 #ifndef TRANSPORTS_SPIDEV_H
 #define TRANSPORTS_SPIDEV_H
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <unordered_map>
 
 #include <toml++/toml.h>
 
@@ -64,6 +66,9 @@ class Spidev: public TransportBase {
         static std::pair<std::string, size_t> ParseGpio(const std::string &);
 
     private:
+        /// Post-command delays (write)
+        const static std::unordered_map<CommandId, std::chrono::microseconds> gWriteDelays;
+
         /// SPI device file descriptor
         int spidev{-1};
 

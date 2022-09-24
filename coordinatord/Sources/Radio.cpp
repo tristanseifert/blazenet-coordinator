@@ -165,6 +165,53 @@ void Radio::transmitPacket(const std::unique_ptr<TxPacket> &packet) {
     this->transmitPacket(header, packet->payload);
 }
 
+/**
+ * @brief Update the beacon configuration
+ *
+ * The radio is capable of autonomously transmitting beacon frames, with a high degree of timing
+ * accuracy compared to the host. This configuration defines what data is part of this request.
+ */
+void Radio::setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
+        std::span<const std::byte> payload, const bool updateConfig) {
+    Transports::Response::GetStatus status{};
+
+    // validate inputs
+    if(interval.count() < kMinBeaconInterval) {
+        throw std::invalid_argument(fmt::format("interval too small (min {} msec)",
+                    kMinBeaconInterval));
+    } else if(interval.count() > UINT16_MAX) {
+        throw std::invalid_argument(fmt::format("interval too large (max {} msec)", UINT16_MAX));
+    }
+
+    // prepare a buffer of the appropriate size
+    std::vector<std::byte> buf;
+    buf.resize(sizeof(Transports::Request::BeaconConfig) + payload.size());
+
+    auto cmd = reinterpret_cast<Transports::Request::BeaconConfig *>(buf.data());
+    new(cmd) Transports::Request::BeaconConfig;
+
+    // fill in the structure
+    cmd->updateConfig = updateConfig;
+
+    if(updateConfig) {
+        cmd->enabled = enabled;
+        cmd->interval = interval.count();
+    }
+
+    if(!payload.empty()) {
+        memcpy(cmd->data, payload.data(), payload.size());
+    }
+
+    // transmit the command
+    this->transport->sendCommandWithPayload(Transports::CommandId::BeaconConfig, buf);
+
+    // check for success
+    this->queryStatus(status);
+    if(!status.cmdSuccess) {
+        throw std::runtime_error("radio reported error from updating beacon config");
+    }
+}
+
 
 
 /**

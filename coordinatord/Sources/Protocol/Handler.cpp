@@ -16,9 +16,8 @@ using namespace Protocol;
  * @param radio Radio to communicate with (assumed to be set up already)
  */
 Handler::Handler(const std::shared_ptr<Radio> &_radio) : radio(_radio) {
-    // set up beacon frames
     this->initBeaconBuffer();
-    this->initBeaconTimer();
+    this->uploadBeaconFrame();
 }
 
 /**
@@ -39,12 +38,26 @@ Handler::~Handler() {
  * This sets up the common part of the beacon frame that doesn't change.
  */
 void Handler::initBeaconBuffer() {
+    using namespace std::chrono_literals;
+
     // TODO: implement this properly
     this->beaconBuffer.resize(16);
     this->beaconBuffer[0] = std::byte{0x0f};
 
     const char *buf = "smoke weed 420";
     memcpy(this->beaconBuffer.data() + 1, buf, 14);
+
+    // set up default beacon interval
+    this->beaconInterval = 5000ms;
+}
+
+/**
+ * @brief Upload beacon configuration to radio
+ *
+ * Send the beacon frame and current interval to the radio.
+ */
+void Handler::uploadBeaconFrame() {
+    this->radio->setBeaconConfig(true, this->beaconInterval, this->beaconBuffer);
 }
 
 /**

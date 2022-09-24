@@ -2,6 +2,7 @@
 #define RADIO_H
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -102,6 +103,9 @@ class Radio {
         /// Supported protocol version
         constexpr static const uint8_t kProtocolVersion{0x01};
 
+        /// Minimum beacon interval (msec)
+        constexpr static const size_t kMinBeaconInterval{1'000};
+
     public:
         Radio(const std::shared_ptr<Transports::TransportBase> &transport);
         ~Radio();
@@ -136,8 +140,42 @@ class Radio {
         void queueTransmitPacket(const PacketPriority priority,
                 std::span<const std::byte> payload);
 
+        /**
+         * @brief Update the beacon configuration (without changing the packet)
+         *
+         * @param enabled Are beacon frames enabled?
+         * @param interval Time interval between beacon frames
+         */
+        inline void setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval) {
+            this->setBeaconConfig(enabled, interval, {}, true);
+        }
+        /**
+         * @brief Update the beacon configuration
+         *
+         * @param enabled Are beacon frames enabled?
+         * @param interval Time interval between beacon frames
+         * @param payload Contents of the beacon frame
+         */
+        inline void setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
+                std::span<const std::byte> payload) {
+            this->setBeaconConfig(enabled, interval, payload, true);
+        }
+        /**
+         * @brief Update the beacon frame contents
+         *
+         * Change the contents of the beacon frame without changing any other configuration.
+         *
+         * @param payload Contents of the beacon frame
+         */
+        inline void setBeaconConfig(std::span<const std::byte> payload) {
+            using namespace std::chrono_literals;
+            this->setBeaconConfig(false, 0ms, payload, false);
+        }
+
     private:
         void transmitPacket(const std::unique_ptr<TxPacket> &);
+        void setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
+                std::span<const std::byte> payload, const bool updateConfig);
 
         void irqHandler();
         void readPacket();

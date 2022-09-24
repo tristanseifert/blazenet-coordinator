@@ -1,6 +1,7 @@
 #ifndef PROTOCOL_HANDLER_H
 #define PROTOCOL_HANDLER_H
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <vector>
@@ -22,6 +23,8 @@ class Handler {
 
     private:
         void initBeaconBuffer();
+        void uploadBeaconFrame();
+
         void initBeaconTimer();
         void sendBeacon();
 
@@ -29,6 +32,8 @@ class Handler {
         /// Underlying radio we're communicating with
         std::shared_ptr<Radio> radio;
 
+        /// Beacon interval
+        std::chrono::milliseconds beaconInterval;
         /// timer event for beacon frames
         struct event *beaconTimerEvent{nullptr};
         /// Buffer for beacon frames
