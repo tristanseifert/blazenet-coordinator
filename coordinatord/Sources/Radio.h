@@ -251,6 +251,16 @@ class Radio {
             return this->txCounters;
         }
 
+        /**
+         * @brief Get the number of ignored interrupts
+         *
+         * This is the number of interrupts that were declared as lost because we did not get an
+         * interrupt servicing in time.
+         */
+        constexpr inline auto getLostIrqs() const {
+            return this->numLostIrqs;
+        }
+
     private:
         void transmitPacket(const std::unique_ptr<TxPacket> &);
         void setBeaconConfig(const bool enabled, const std::chrono::milliseconds interval,
@@ -311,6 +321,8 @@ class Radio {
         /// Current transmit power
         uint16_t currentTxPower;
 
+        /// Number of "lost" irq's
+        size_t numLostIrqs{0};
         /// Number of interrupts triggered
         size_t irqCounter{0};
         /// Irq watchdog timer

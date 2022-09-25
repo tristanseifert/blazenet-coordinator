@@ -378,7 +378,7 @@ void Radio::irqWatchdogFired() {
         this->getPendingInterrupts(irq);
 
         if(*((uint8_t *) &irq)) {
-            // TODO: accounting for lost interrupts
+            this->numLostIrqs++;
             PLOG_WARNING << fmt::format("Lost IRQ: 0b{:08b}", *((uint8_t *) &irq));
         }
 
@@ -400,8 +400,6 @@ void Radio::irqHandler() {
     std::lock_guard lg(this->transportLock);
 
     this->getPendingInterrupts(irq);
-    PLOG_INFO << fmt::format("IRQ: 0b{:08b}", *((uint8_t *) &irq));
-
     this->irqHandlerCommon(irq);
 }
 
@@ -453,11 +451,10 @@ void Radio::readPacket(bool &outRead) {
         return;
     }
 
-    PLOG_VERBOSE << fmt::format("rx packet pending: {} bytes", status.rxPacketSize);
-
     // allocate packet buffer and read
     packetData.resize(status.rxPacketSize);
     this->readPacket(packet, packetData);
+    outRead = true;
 }
 
 /**
