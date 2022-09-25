@@ -70,10 +70,12 @@ class Task {
             PacketTransmitted                   = (1 << 1),
             /// Failed to transmit a packet, because the channel is busy (retry later)
             TxChannelBusy                       = (1 << 2),
+            /// Radio must be calibrated as soon as possible
+            CalibrationRequired                 = (1 << 3),
 
             /// Bitwise OR of all supported task notification bits
             All                                 = (PacketReceived | PacketTransmitted |
-                    TxChannelBusy),
+                    TxChannelBusy | CalibrationRequired),
         };
 
     public:
@@ -92,7 +94,7 @@ class Task {
 
     private:
         static void InitAutoAck();
-        static void InitCsma();
+        static void InitCalibration();
 
         static void Main();
 
@@ -107,6 +109,11 @@ class Task {
         static TaskHandle_t gTask;
         /// Radio interface handle (used for all later interfaces)
         static RAIL_Handle_t gRail;
+
+        /// Radio calibration data
+        static RAIL_CalValues_t gCalibrationData;
+        /// Image rejection calibration value
+        static uint32_t gCalibrationIr;
 
         /// Performance counter to track the number of receive FIFO overflows
         static size_t gRxFifoOverflows;

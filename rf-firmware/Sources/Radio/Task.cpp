@@ -12,6 +12,8 @@ using namespace Radio;
 
 TaskHandle_t Task::gTask;
 RAIL_Handle_t Task::gRail;
+RAIL_CalValues_t Task::gCalibrationData = RAIL_IRCALVALUES_UNINIT;
+uint32_t Task::gCalibrationIr{0};
 
 size_t Task::gRxFifoOverflows{0}, Task::gRxFrameErrors{0}, Task::gRxFrames{0};
 
@@ -74,6 +76,24 @@ void Task::InitAutoAck() {
     REQUIRE(err == RAIL_STATUS_NO_ERROR, "%s failed: %d", "RAIL_ConfigAutoAck", err);
 }
 
+/**
+ * @brief Initialize radio calibrations
+ *
+ * Sets up the requested radio calibrations, and performs image rejection calibration.
+ */
+void Task::InitCalibration() {
+    RAIL_Status_t err;
+
+    // enable power amplifier calibration
+    RAIL_EnablePaCal(true);
+
+    // perform image rejection calibration
+    err = RAIL_CalibrateIr(gRail, &gCalibrationIr);
+    REQUIRE(err == RAIL_STATUS_NO_ERROR, "%s failed: %d", "RAIL_CalibrateIr", err);
+
+    Logger::Debug("Radio IR calib: %08x", gCalibrationIr);
+}
+
 
 
 /**
@@ -83,13 +103,13 @@ void Task::Main() {
     int err;
     BaseType_t ok;
 
-    // perform deferred setup
+    // perform deferred radio setup
     Logger::Trace("%s: init", "Radio");
 
     RAIL_ResetFifo(gRail, true, true);
 
-    // TODO: handle more stuff
     // InitAutoAck();
+    InitCalibration();
 
     // wait for event
     while(true) {
@@ -130,6 +150,17 @@ void Task::Main() {
             else {
                 Logger::Warning("dropped packet %p due to CSMA fail", gLastTx);
                 HandleTxComplete();
+            }
+        }
+        // calibrate radio
+        if(note & NotifyBits::CalibrationRequired) {
+            // TODO: notify nodes we're going away for a bit
+            Logger::Notice("Calibration required: %08x", RAIL_GetPendingCal(gRail));
+
+            // okay, do it
+            auto status = RAIL_Calibrate(gRail, &gCalibrationData, RAIL_CAL_ALL_PENDING);
+            if(status != RAIL_STATUS_NO_ERROR) {
+                Logger::Warning("Calibration failed: %d", status);
             }
         }
     }
@@ -403,6 +434,11 @@ extern "C" void sl_rail_util_on_event(RAIL_Handle_t handle, RAIL_Events_t events
     if(events & RAIL_EVENT_RX_FIFO_OVERFLOW) {
         Task::gRxFifoOverflows++;
         RAIL_ResetFifo(handle, false, true);
+    }
+    // Radio requires calibration
+    if(events & RAIL_EVENT_CAL_NEEDED) {
+        xTaskNotifyIndexedFromISR(Task::gTask, Task::kNotificationIndex,
+                Task::NotifyBits::CalibrationRequired, eSetBits, &woken);
     }
 
     // perform a pended context switch if needed
