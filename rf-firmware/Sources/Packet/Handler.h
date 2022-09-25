@@ -57,7 +57,7 @@ class Handler {
          * This is the maximum number of packets that may be queued for reading by the host at a
          * given time.
          */
-        constexpr static const size_t kMaxRxQueueSize{64};
+        constexpr static const size_t kMaxRxQueueSize{255};
 
         /**
          * @brief Maximum size to reserve for transmit buffers

@@ -39,9 +39,9 @@ extern void log_panic(const char *fmt, ...);
  * Defines the rate of timer interrupts per second, and in turn, the granularity of the software
  * timer facilities.
  */
-#define configTICK_RATE_HZ                                      ((TickType_t) 100)
+#define configTICK_RATE_HZ                                      ((TickType_t) 250)
 
-#define configMAX_PRIORITIES                                    6
+#define configMAX_PRIORITIES                                    7
 #define configMINIMAL_STACK_SIZE                                ((unsigned short) 130)
 
 #define configMAX_TASK_NAME_LEN                                 (16)
@@ -73,7 +73,7 @@ extern void log_panic(const char *fmt, ...);
 /// Enable software timers
 #define configUSE_TIMERS                                        1
 // Run at middleware priority
-#define configTIMER_TASK_PRIORITY                               (3)
+#define configTIMER_TASK_PRIORITY                               (2)
 #define configTIMER_QUEUE_LENGTH                                5
 #define configTIMER_TASK_STACK_DEPTH                            (configMINIMAL_STACK_SIZE * 2)
 
