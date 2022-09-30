@@ -46,6 +46,29 @@ class Spidev: public TransportBase {
          */
         constexpr static const size_t kPostCmdDelay{50};
 
+        /**
+         * @brief Reset assertion time (µS)
+         *
+         * How long the reset line is asserted
+         */
+        constexpr static const size_t kResetAssertTime{20 * 1000};
+
+        /**
+         * @brief Post-reset wait time (µS)
+         *
+         * Time required for the radio to come out of a reset and be available to respond to host
+         * commands
+         */
+        constexpr static const size_t kResetWaitTime{750 * 1000};
+
+        /**
+         * @brief Support interrupt toggle
+         *
+         * When set, we'll process interrupt handlers on both edges, as the interrupt line toggles
+         * for every event, rather than being active low.
+         */
+        constexpr static const bool kIrqTogglingMode{false};
+
     public:
         Spidev(const toml::table &config);
         ~Spidev();

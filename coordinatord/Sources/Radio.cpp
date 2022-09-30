@@ -5,6 +5,7 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include "Support/Confd.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Transports/Base.h"
@@ -61,13 +62,11 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
     this->initCounterReader();
 
     /*
-     * Then, configure the radio for operation by setting configuration that won't change for
-     * the duration of its operation, such as the regulatory domain.
-     *
-     * No channel or beacon configuration will have been set yet: this is done later once we've
-     * determined this configuration from other parts of the system.
+     * Then, configure the radio for operation by setting configuration data. We read this out of
+     * the runtime configuration settings land, the same as we would if we got a request to
+     * refresh the radio config at runtime.
      */
-    // TODO: set regulatory domain
+    this->reloadConfig(true);
 }
 
 /**
@@ -89,6 +88,43 @@ Radio::~Radio() {
 }
 
 
+
+/**
+ * @brief Read the radio configuration
+ *
+ * Use the runtime configuration mechanism to load the radio settings (such as channel, transmit
+ * power, regulatory domain, etc.) and apply it to our internal configuration.
+ *
+ * @param apply When set, the configuration is uploaded to the radio
+ */
+void Radio::reloadConfig(const bool upload) {
+    // channel
+    auto channel = Support::Confd::GetInteger("radio.phy.channel");
+    if(!channel) {
+        throw std::runtime_error("failed to read `radio.phy.channel`");
+    }
+
+    this->setChannel(*channel);
+
+    // transmit power (convert float dBm -> deci-dBm)
+    auto txPower = Support::Confd::GetReal("radio.phy.txPower");
+    if(!txPower) {
+        throw std::runtime_error("failed to read `radio.phy.txPower`");
+    }
+
+    const size_t deciDbmTx = std::max(0., *txPower * 10.);
+    this->setTxPower(deciDbmTx);
+
+    PLOG_VERBOSE << "Read radio config: channel=" << *channel << ", tx power="
+        << (deciDbmTx / 10.) << " dBm";
+
+    // TODO: set regulatory domain
+
+    // upload to radio if requested
+    if(upload) {
+        this->uploadConfig();
+    }
+}
 
 /**
  * @brief Synchronize radio configuration

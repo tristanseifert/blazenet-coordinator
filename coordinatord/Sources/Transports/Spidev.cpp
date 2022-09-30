@@ -145,7 +145,11 @@ void Spidev::initIrq(const std::string &lineDesc) {
     }
 
     // get falling edge interrupts
-    err = gpiod_line_request_falling_edge_events(line, "blazed-spidev-irq");
+    if(kIrqTogglingMode) {
+        err = gpiod_line_request_both_edges_events(line, "blazed-spidev-irq");
+    } else {
+        err = gpiod_line_request_falling_edge_events(line, "blazed-spidev-irq");
+    }
     if(err) {
         gpiod_line_close_chip(line);
         throw std::system_error(errno, std::generic_category(),
@@ -265,7 +269,7 @@ void Spidev::reset() {
     }
 
     // wait for reset to complete
-    usleep(20 * 1000);
+    usleep(kResetAssertTime);
 
     // then release (deasert) the line
     err = gpiod_line_set_value(this->resetLine, false);
@@ -280,7 +284,7 @@ void Spidev::reset() {
      * other long-running maintenance operation is ongoing. We assume those take place while the
      * Linux system we're running on is booting.
      */
-    usleep(500 * 1000);
+    usleep(kResetWaitTime);
 }
 
 /**
@@ -397,9 +401,7 @@ void Spidev::handleIrq(int fd, size_t flags) {
     }
 
     // process the event
-    if(info.event_type == GPIOD_LINE_EVENT_FALLING_EDGE) {
-        this->invokeIrqHandlers();
-    }
+    this->invokeIrqHandlers();
 }
 
 

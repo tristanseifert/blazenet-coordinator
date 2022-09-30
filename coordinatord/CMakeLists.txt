@@ -113,10 +113,23 @@ target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt OpenSSL
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
 
+# add confd support (if the system has the support library)
+find_library(LIB_CONFD confd)
+if(LIB_CONFD)
+    message(STATUS "Building with confd support")
+
+    target_compile_definitions(daemon PRIVATE -DCONFIG_WITH_CONFD)
+    target_link_libraries(daemon PUBLIC confd)
+
+    target_sources(daemon PRIVATE Sources/Support/Confd.cpp)
+endif()
+
 # add systemd support on linux
 if(UNIX AND NOT APPLE)
     pkg_search_module(PKG_SYSTEMD libsystemd)
     link_directories(${PKG_SYSTEMD_LIBRARY_DIRS})
+
+    message(STATUS "Building with systemd support")
 
     target_include_directories(daemon PRIVATE ${PKG_SYSTEMD_INCLUDE_DIRS})
     target_link_libraries(daemon PUBLIC ${PKG_SYSTEMD_LIBRARIES})

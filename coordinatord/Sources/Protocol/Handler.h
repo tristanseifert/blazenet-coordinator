@@ -18,12 +18,20 @@ namespace Protocol {
  */
 class Handler {
     public:
+        /**
+         * @brief Minimum beacon interval (msec)
+         */
+        constexpr static const size_t kMinBeaconInterval{1'000};
+
+    public:
         Handler(const std::shared_ptr<Radio> &radio);
         ~Handler();
 
+        void reloadConfig(const bool upload);
+
     private:
         void initBeaconBuffer();
-        void uploadBeaconFrame();
+        void uploadBeaconFrame(const bool frameChanged);
 
         void initBeaconTimer();
         void sendBeacon();
@@ -33,7 +41,7 @@ class Handler {
         std::shared_ptr<Radio> radio;
 
         /// Beacon interval
-        std::chrono::milliseconds beaconInterval;
+        std::chrono::milliseconds beaconInterval{0};
         /// timer event for beacon frames
         struct event *beaconTimerEvent{nullptr};
         /// Buffer for beacon frames

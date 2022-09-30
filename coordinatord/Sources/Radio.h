@@ -174,6 +174,8 @@ class Radio {
         Radio(const std::shared_ptr<Transports::TransportBase> &transport);
         ~Radio();
 
+        void reloadConfig(const bool upload);
+
         /**
          * @brief Update the radio channel
          *

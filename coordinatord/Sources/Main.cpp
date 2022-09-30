@@ -14,6 +14,7 @@
 #include "Config/Reader.h"
 #include "Protocol/Handler.h"
 #include "Transports/Base.h"
+#include "Support/Confd.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -91,17 +92,6 @@ static void ParseArgs(const int argc, char **argv) {
 }
 
 /**
- * @brief Configure radio settings
- *
- * Sets up the radio configuration (channel, power, etc.)
- */
-static void ConfigureRadio(const std::shared_ptr<Radio> &radio) {
-    radio->setChannel(9);
-    radio->setTxPower(80);
-    radio->uploadConfig();
-}
-
-/**
  * @brief Run the deamon's main loop
  */
 static void RunMainLoop() {
@@ -129,7 +119,7 @@ int main(int argc, char **argv) {
     Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
     PLOG_INFO << "Starting blazed version " << kVersion << " (" << kVersionGitHash << ")";
 
-    // initialize the event loop, then read config (which may attach of event sources)
+    // initialize the event loop, then do config initialization
     gMainLoop = std::make_shared<Support::EventLoop>(true);
     gMainLoop->arm();
 
@@ -139,10 +129,16 @@ int main(int argc, char **argv) {
         PLOG_FATAL << "Failed to parse config file: " << e.what();
         return 1;
     }
+    try {
+        Support::Confd::Init();
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Failed to set up runtime config support: " << e.what();
+        return 1;
+    }
 
     // perform more initialization
     try {
-        // set up the radio transport and radio instance
+        // set up the radio transport and radio instance (which will configure the radio)
         auto transport = Transports::TransportBase::Make(Config::GetTransportConfig());
         if(!transport) {
             throw std::runtime_error("failed to initialize transport (check transport type)");
@@ -150,9 +146,7 @@ int main(int argc, char **argv) {
 
         auto radio = std::make_shared<Radio>(transport);
 
-        // configure radio before setting up packet handler
-        ConfigureRadio(radio);
-
+        // set up packet handler
         gHandler = std::make_shared<Protocol::Handler>(radio);
     } catch(const std::exception &e) {
         PLOG_FATAL << "Initialization failed: " << e.what();

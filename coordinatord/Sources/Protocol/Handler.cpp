@@ -1,8 +1,10 @@
 #include <stdexcept>
 #include <sys/time.h>
+
 #include <fmt/format.h>
 #include <event2/event.h>
 
+#include "Support/Confd.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Radio.h"
@@ -16,8 +18,12 @@ using namespace Protocol;
  * @param radio Radio to communicate with (assumed to be set up already)
  */
 Handler::Handler(const std::shared_ptr<Radio> &_radio) : radio(_radio) {
+    // load configuration
+    this->reloadConfig(false);
+
+    // perform initialization
     this->initBeaconBuffer();
-    this->uploadBeaconFrame();
+    this->uploadBeaconFrame(true);
 }
 
 /**
@@ -27,6 +33,31 @@ Handler::~Handler() {
     if(this->beaconTimerEvent) {
         event_del(this->beaconTimerEvent);
         event_free(this->beaconTimerEvent);
+    }
+}
+
+
+
+/**
+ * @brief Load the protocol handler configuration
+ *
+ * This will set up stuff such as the beacon (interval, network UUID, supported features)
+ *
+ * @param upload Whether configuration is uploaded to the radio as well
+ */
+void Handler::reloadConfig(const bool upload) {
+    // read the beacon config
+    auto beaconInterval = Support::Confd::GetInteger("radio.beacon.interval").value_or(5000);
+    if(beaconInterval < kMinBeaconInterval) {
+        throw std::runtime_error(fmt::format("invalid beacon interval: {} (min {})",
+                    beaconInterval, kMinBeaconInterval));
+    }
+
+    this->beaconInterval = std::chrono::milliseconds(beaconInterval);
+
+    // upload config to radio if needed
+    if(upload) {
+        this->uploadBeaconFrame(true);
     }
 }
 
@@ -46,18 +77,22 @@ void Handler::initBeaconBuffer() {
 
     const char *buf = "smoke weed 420";
     memcpy(this->beaconBuffer.data() + 1, buf, 14);
-
-    // set up default beacon interval
-    this->beaconInterval = 5000ms;
 }
 
 /**
  * @brief Upload beacon configuration to radio
  *
  * Send the beacon frame and current interval to the radio.
+ *
+ * @param frameChanged When set, the content of the beacon frame has changed and needs to be
+ *        uploaded again
  */
-void Handler::uploadBeaconFrame() {
-    this->radio->setBeaconConfig(true, this->beaconInterval, this->beaconBuffer);
+void Handler::uploadBeaconFrame(const bool frameChanged) {
+    if(frameChanged) {
+        this->radio->setBeaconConfig(true, this->beaconInterval, this->beaconBuffer);
+    } else {
+        this->radio->setBeaconConfig(true, this->beaconInterval);
+    }
 }
 
 /**
