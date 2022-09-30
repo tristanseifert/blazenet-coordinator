@@ -53,8 +53,16 @@ void IrqManager::Update() {
     const auto prev = gMaskedActive;
     const auto changed = (result != gMaskedActive);
 
-    if(!gLostIrqRecovery) {
-        SetIrqStatus(TestFlags(result));
+    if(kToggleIrqLine) {
+        // toggle IRQ line
+        if(changed) {
+            GPIO_PinOutToggle(HOST_nIRQ_PORT, HOST_nIRQ_PIN);
+        }
+    } else {
+        // IRQ line is level active
+        if(!gLostIrqRecovery) {
+            SetIrqStatus(TestFlags(result));
+        }
     }
     gMaskedActive = result;
 

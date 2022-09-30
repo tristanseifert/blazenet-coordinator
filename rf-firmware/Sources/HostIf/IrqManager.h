@@ -61,9 +61,15 @@ class IrqManager {
     private:
         /// Whether IRQ state changes are logged
         constexpr static const bool kLogChanges{false};
+        /// Does the IRQ line toggle every IRQ change, or is it level activated?
+        constexpr static const bool kToggleIrqLine{false};
 
         /// How many ticks an irq may be pending for before it's considered lost
         constexpr static const size_t kIrqThreshold{pdMS_TO_TICKS(50)};
+
+    public:
+        /// Whether interrupt recovery is needed
+        constexpr static const bool kRecoveryEnabled{false};
 
     public:
         static void Init();

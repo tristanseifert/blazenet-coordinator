@@ -20,6 +20,9 @@ using namespace Rtos;
  * power state, until the next interrupt.
  */
 extern "C" void vApplicationIdleHook() {
-    HostIf::IrqManager::TickCallback();
+    if(HostIf::IrqManager::kRecoveryEnabled) {
+        HostIf::IrqManager::TickCallback();
+    }
+
     __WFI();
 }
