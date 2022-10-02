@@ -105,6 +105,9 @@ to exclude the API function. */
 #define INCLUDE_eTaskGetState                                   1
 #define INCLUDE_xTimerPendFunctionCall                          1
 
+// routines required for cmsis-rtos2 support
+#define INCLUDE_xTaskGetSchedulerState                          1
+#define INCLUDE_uxTaskGetStackHighWaterMark                     1
 // include various functions for acquiring task handles
 #define INCLUDE_xTaskGetCurrentTaskHandle                       1
 #define INCLUDE_xTaskGetIdleTaskHandle                          1

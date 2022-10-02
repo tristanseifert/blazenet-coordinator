@@ -9,6 +9,7 @@
 
 #include "BuildInfo.h"
 #include "BlazeNet/Init.h"
+#include "Crypto/Init.h"
 #include "Fs/Init.h"
 #include "HostIf/Init.h"
 #include "Hw/Clocks.h"
@@ -61,6 +62,8 @@ static void HwInit() {
 static void SwInit() {
     Logger::Notice("blazenet-rf firmware (%s-%s/%s) built on %s", gBuildInfo.gitBranch,
             gBuildInfo.gitHash, gBuildInfo.buildType, gBuildInfo.buildDate);
+
+    Crypto::Init();
 
     Fs::Init();
 

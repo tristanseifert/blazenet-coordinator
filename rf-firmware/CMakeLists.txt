@@ -108,6 +108,9 @@ add_firmware_executable(NAME firmware FILENAME "blazenet-coordinator-rf-firmware
     Sources/BlazeNet/Beacon.cpp
     Sources/Drivers/sl_spidrv_init.c
     Sources/Drivers/sl_uartdrv_init.c
+    Sources/Crypto/Init.cpp
+    Sources/Crypto/Context.cpp
+    Sources/Crypto/Context+Util.cpp
 )
 
 target_include_directories(firmware PUBLIC Includes)
@@ -122,9 +125,9 @@ set_source_files_properties(Sources/Drivers/sl_uartdrv_init.c PROPERTIES COMPILE
 target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor embedded-fw-base::spiffs)
 
 # FreeRTOS
-target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS embedded-fw-base::cmsis-rtos)
+target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS-CMSIS)
 
 # hardware drivers
 target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail
     embedded-fw-base::efr32xg23-emdrv-spidrv embedded-fw-base::efr32xg23-emdrv-uartdrv
-    embedded-fw-base::efr32xg23-emdrv-tempdrv)
+    embedded-fw-base::efr32xg23-emdrv-tempdrv embedded-fw-base::efr32xg23-se-manager)
