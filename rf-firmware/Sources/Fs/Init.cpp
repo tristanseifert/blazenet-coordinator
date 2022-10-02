@@ -201,7 +201,7 @@ void Fs::Init() {
 
     REQUIRE(superblockValid, "flash superblock is invalid!");
 
-    Logger::Notice("Superblock (version %08x)", superblock->version);
+    Logger::Notice("FS: Superblock (version %08x)", superblock->version);
 
     /*
      * The superblock is valid, so initialize the filesystem. This ensures the filesystem type is
@@ -209,7 +209,7 @@ void Fs::Init() {
      */
     REQUIRE(superblock->fsType == Superblock::FsType::SPIFFS, "unsupported filesystem: %08x",
             superblock->fsType);
-    Logger::Notice("Mounting filesystem");
+    Logger::Notice("FS: Mounting filesystem (type %08x)", superblock->fsType);
 
     err = NorFs::Mount(flash, superblock);
     REQUIRE(!err, "%s failed: %d", "mount fs", err);

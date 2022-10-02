@@ -33,6 +33,7 @@ class NorFs {
 
     private:
         static void InitFsConfig(Flash *flash, Superblock *block);
+        static void CheckSpiffsConsistency();
 
     private:
         static Flash *gFlash;

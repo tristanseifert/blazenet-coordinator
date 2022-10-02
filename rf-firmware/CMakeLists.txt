@@ -122,7 +122,7 @@ set_source_files_properties(Sources/Drivers/sl_uartdrv_init.c PROPERTIES COMPILE
 target_link_libraries(firmware PRIVATE embedded-fw-base::tinycbor embedded-fw-base::spiffs)
 
 # FreeRTOS
-target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS)
+target_link_libraries(firmware PRIVATE embedded-fw-base::FreeRTOS embedded-fw-base::cmsis-rtos)
 
 # hardware drivers
 target_link_libraries(firmware PRIVATE embedded-fw-base::efr32xg23-rail

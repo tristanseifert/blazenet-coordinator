@@ -78,7 +78,7 @@ int NorFs::Mount(Flash *flash, Superblock *super) {
     cacheSize = (gFsConfig.log_page_size + 32) * 4;
     cache = reinterpret_cast<uint8_t *>(malloc(cacheSize));
     if(!cache) {
-        Logger::Warning("couldn't alloc %u bytes fs cache", cacheSize);
+        Logger::Warning("FS: couldn't alloc %u bytes fs cache", cacheSize);
         cacheSize = 0;
     }
 
@@ -87,6 +87,11 @@ int NorFs::Mount(Flash *flash, Superblock *super) {
     if(err) {
         free(work);
         free(cache);
+    }
+
+    // ensure filesystem consistency
+    if(err == SPIFFS_OK) {
+        CheckSpiffsConsistency();
     }
 
     return err;
@@ -100,6 +105,29 @@ outofmem:;
         free(cache);
     }
     return Error::OutOfMemory;
+}
+
+/**
+ * @brief Ensure filesystem consistency post mount
+ *
+ * Verify that the filesystem is consistent by checking the capacity and usage counters; if this
+ * is wonky, we run a full check.
+ */
+void NorFs::CheckSpiffsConsistency() {
+    int err;
+    uint32_t total{0}, used{0};
+
+    err = SPIFFS_info(&gFs, &total, &used);
+    REQUIRE(err == SPIFFS_OK, "%s failed: %d", "SPIFFS_info", err);
+
+    Logger::Notice("FS: used %u of %u bytes", used, total);
+
+    if(total < used) {
+        Logger::Warning("FS: inconsistency detected, running check!");
+
+        err = SPIFFS_check(&gFs);
+        Logger::Warning("FS: %s returned %d", "SPIFFS_check", err);
+    }
 }
 
 

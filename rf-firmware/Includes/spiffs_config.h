@@ -30,7 +30,8 @@ extern void do_log(const unsigned int inLevel, const char *fmt, ...);
 
 // Set generic spiffs debug output call.
 #ifndef SPIFFS_DBG
-#define SPIFFS_DBG(_f, ...) do_log(2, _f, ## __VA_ARGS__)
+#define SPIFFS_DBG(_f, ...)
+// #define SPIFFS_DBG(_f, ...) do_log(2, _f, ## __VA_ARGS__)
 #endif
 // Set spiffs debug output call for garbage collecting.
 #ifndef SPIFFS_GC_DBG
@@ -44,7 +45,8 @@ extern void do_log(const unsigned int inLevel, const char *fmt, ...);
 #endif
 // Set spiffs debug output call for system consistency checks.
 #ifndef SPIFFS_CHECK_DBG
-#define SPIFFS_CHECK_DBG(_f, ...) do_log(2, _f, ## __VA_ARGS__)
+#define SPIFFS_CHECK_DBG(_f, ...)
+//#define SPIFFS_CHECK_DBG(_f, ...) do_log(2, _f, ## __VA_ARGS__)
 #endif
 // Set spiffs debug output call for all api invocations.
 #ifndef SPIFFS_API_DBG

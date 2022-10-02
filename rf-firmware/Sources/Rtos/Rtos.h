@@ -14,6 +14,8 @@
 #include <task.h>
 #include <timers.h>
 
+#include <cmsis_os2.h>
+
 namespace Rtos {
 /**
  * @brief Firmware-specific priority level assignments
@@ -25,44 +27,44 @@ enum TaskPriority: UBaseType_t {
     /**
      * @brief Deferred interrupt calls
      */
-    Dpc                                 = (configMAX_PRIORITIES - 1),
+    Dpc                                 = osPriorityISR,
     /**
      * @brief Driver work loops
      */
-    Driver                              = (Dpc - 1),
+    Driver                              = osPriorityRealtime4,
     /**
      * @brief Supervisory tasks
      *
      * Any class of task responsible for making sure we don't self destruct: watchdog checkins,
      * thermal management, etc.
      */
-    Supervisory                         = (Driver - 1),
+    Supervisory                         = osPriorityRealtime,
     /**
      * @brief High priority app
      *
      * Application tasks that have a relatively higher priority, such as control loops.
      */
-    AppHigh                             = (Supervisory - 1),
+    AppHigh                             = osPriorityHigh,
     /**
      * @brief Middleware
      *
      * This includes stuff such as high-level protocol drivers (over the message passing interface)
      * and timers.
      */
-    Middleware                          = (AppHigh - 1),
+    Middleware                          = osPriorityNormal,
     /**
      * @brief Low priority app
      *
      * Low priority application tasks, such as user interface or periodic recalibration.
      */
-    AppLow                              = (AppHigh - 1),
+    AppLow                              = osPriorityBelowNormal,
     /**
      * @brief Idle
      *
      * Tasks that run when no other processing in the system is going on; useful for background
      * maintenance type tasks.
      */
-    Background                          = (AppLow - 1),
+    Background                          = osPriorityLow,
 };
 static_assert(TaskPriority::Background >= 0);
 static_assert(TaskPriority::Background < configMAX_PRIORITIES);

@@ -41,7 +41,7 @@ extern void log_panic(const char *fmt, ...);
  */
 #define configTICK_RATE_HZ                                      ((TickType_t) 250)
 
-#define configMAX_PRIORITIES                                    7
+#define configMAX_PRIORITIES                                    56
 #define configMINIMAL_STACK_SIZE                                ((unsigned short) 130)
 
 #define configMAX_TASK_NAME_LEN                                 (16)
