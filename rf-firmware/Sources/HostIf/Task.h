@@ -28,8 +28,10 @@ struct GetStatus;
 enum class HandlerFlags: uintptr_t {
     /// Does the handler support reads?
     SupportsRead                                = (1 << 0),
+    /// Post-read callback should be executed
+    WantsPostRead                               = (1 << 1),
     /// Does the handler support writes?
-    SupportsWrite                               = (1 << 1),
+    SupportsWrite                               = (1 << 4),
 };
 ENUM_FLAGS_EX(HandlerFlags, uintptr_t);
 
@@ -75,18 +77,34 @@ class Task {
              * Invoked when the host requests this command and desires to read back data. The
              * handler shall fill the provided buffer.
              *
+             * @param cmd Command index
+             * @param size Number of bytes requested (in packet header)
+             * @param data Buffer to receive the payload data
+             *
              * @return Number of bytes actually written to buffer, or a negative error code
              */
-            int (*read)(const uint8_t, const size_t, etl::span<uint8_t>);
+            int (*read)(const uint8_t cmd, const size_t size, etl::span<uint8_t> data);
+
+            /**
+             * @brief Post-read callback
+             *
+             * Invoked after all payload data has been read out by the client.
+             *
+             * @param cmd Command index
+             * @param success Set when the command completed successfully
+             */
+            void (*readComplete)(const uint8_t cmd, const bool success);
 
             /**
              * @brief Write callback
              *
              * Invoked when the host executes this command and provides a payload.
              *
+             * @param cmd Command index
+             *
              * @return 0 on success, or a negative error code
              */
-            int (*write)(const uint8_t, etl::span<const uint8_t>);
+            int (*write)(const uint8_t cmd, etl::span<const uint8_t> payload);
         };
 
     public:
@@ -116,6 +134,7 @@ class Task {
         static void ProcessCommand();
         static void DispatchCommand(const uint8_t, etl::span<uint8_t>);
         static void DispatchCommandWithResponse(const uint8_t, const size_t);
+        static void DispatchCommandPostRead(const uint8_t, const bool);
 
         static void ReadCommand();
         static void ReadPayload(const size_t);
@@ -131,6 +150,8 @@ class Task {
         static bool gCommandBufferValid;
         /// Command structure received from host
         static struct CommandHeader gCommandBuffer;
+        /// Pointer to the command handler struct for the current command
+        static const CommandHandler *gCurrentHandler;
         /// Number of payload bytes received
         static size_t gPayloadBytesReceived;
         /// Buffer for command payload (shared between rx and tx)

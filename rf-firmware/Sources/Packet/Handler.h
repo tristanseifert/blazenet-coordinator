@@ -157,6 +157,9 @@ class Handler {
              */
             uint8_t lqi;
 
+            /// Generate automatic acknowledgement when packet is read out
+            uint8_t autoAck:1{0};
+
             /**
              * @brief Payload
              *
@@ -184,7 +187,7 @@ class Handler {
 
         static RxPacketBuffer *HandleRxPacket(const struct RAIL_RxPacketInfo &,
                 const struct RAIL_RxPacketDetails &);
-        static void DiscardRxPacket(RxPacketBuffer *);
+        static void DiscardRxPacket(RxPacketBuffer *, const bool ack);
 
         /**
          * @brief Peek at the first packet in the receive queue

@@ -107,8 +107,18 @@ Handler::RxPacketBuffer *Handler::HandleRxPacket(const struct RAIL_RxPacketInfo 
 
 /**
  * @brief Releases resources associated with this receive packet buffer
+ *
+ * If the packet should have an acknowledgement auto-generated, we'll queue this here as well.
+ *
+ * @param ack Whether the packet should be positively acknowledged (if desired)
  */
-void Handler::DiscardRxPacket(RxPacketBuffer *buffer) {
+void Handler::DiscardRxPacket(RxPacketBuffer *buffer, const bool ack) {
+    // queue auto-ack
+    if(buffer->autoAck && ack) {
+        Radio::Task::QueueAck({buffer->data, buffer->packetSize});
+    }
+
+    // release the packet buffer
     const auto numBytes = sizeof(*buffer) + buffer->packetSize;
 
     free(buffer);

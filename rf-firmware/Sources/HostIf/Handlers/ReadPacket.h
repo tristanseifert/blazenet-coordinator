@@ -14,6 +14,8 @@ namespace HostIf::Handlers {
  * Read out the topmost packet on the receive queue.
  */
 struct ReadPacket {
+    static Packet::Handler::RxPacketBuffer *gPbuf;
+
     /**
      * @brief Handle a read by the host
      *
@@ -39,12 +41,26 @@ struct ReadPacket {
             memcpy(outBuffer.data() + sizeof(temp), pbuf->data, actualNum - sizeof(temp));
         }
 
-        // release packet
-        Packet::Handler::DiscardRxPacket(pbuf);
+        // store packet for releasing later
+        gPbuf = pbuf;
 
         return actualNum;
     }
+
+    /**
+     * @brief Release the previously read packet
+     *
+     * Invokes the post-read routine to release the previously read packet; this will generate an
+     * acknowledgement as well if requested.
+     *
+     * @param success Whether the command completed successfully (i.e. the entire packet was read)
+     */
+    static void PostRead(const uint8_t, const bool success) {
+        Packet::Handler::DiscardRxPacket(gPbuf, success);
+    }
 };
+
+Packet::Handler::RxPacketBuffer *ReadPacket::gPbuf{nullptr};
 }
 
 #endif

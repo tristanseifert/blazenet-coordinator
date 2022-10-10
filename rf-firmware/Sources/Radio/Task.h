@@ -88,6 +88,7 @@ class Task {
 
         static bool IsActive();
 
+        static void QueueAck(etl::span<const uint8_t> packet);
         [[nodiscard]] static int TxPacketImmediate(Packet::Handler::TxPacketBuffer *packet);
 
         static void ReadCounters(HostIf::Response::GetCounters *packet);

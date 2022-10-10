@@ -16,6 +16,7 @@ TaskHandle_t Task::gTask;
 
 bool Task::gCommandBufferValid{false};
 CommandHeader Task::gCommandBuffer;
+const Task::CommandHandler *Task::gCurrentHandler{nullptr};
 size_t Task::gPayloadBytesReceived{0};
 etl::array<uint8_t, Task::kMaxPayloadSize> Task::gPayloadBuffer;
 
@@ -87,6 +88,10 @@ void Task::Main() {
         }
         // finished transmitting command response; receive next command
         if(note & TaskNotifyBits::ResponseTransmitComplete) {
+            // invoke post routine (if any)
+            DispatchCommandPostRead(gCommandBuffer.command & ~0x80, true);
+
+            // read out next command
             ReadCommand();
         }
     }
@@ -101,7 +106,16 @@ void Task::Main() {
  * @note Requires gCommandBufferValid == true
  */
 void Task::ProcessCommand() {
+    // get the command handler
     const auto cmd = gCommandBuffer.command & ~0x80;
+
+    if(cmd > static_cast<uint8_t>(CommandId::NumCommands)) {
+        Logger::Warning("Invalid cmd %02x", cmd);
+        ReadCommand();
+        return;
+    }
+
+    gCurrentHandler = &gHandlers[cmd];
 
     // process payload-ful command
     if(gCommandBuffer.payloadLength) {
@@ -137,21 +151,12 @@ void Task::ProcessCommand() {
 void Task::DispatchCommand(const uint8_t cmd, etl::span<uint8_t> payload) {
     int err;
 
-    // ensure command is valid
-    if(cmd > static_cast<uint8_t>(CommandId::NumCommands)) {
-        Logger::Warning("Invalid cmd %02x", cmd);
-        return;
-    }
-
-    // invoke handler
-    const auto &handler = gHandlers[cmd];
-
-    if(!TestFlags(handler.flags & HandlerFlags::SupportsWrite)) {
+    if(!TestFlags(gCurrentHandler->flags & HandlerFlags::SupportsWrite)) {
         Logger::Warning("Cmd %02x doesn't support %s", cmd, "write");
         return;
     }
 
-    err = handler.write(cmd, payload);
+    err = gCurrentHandler->write(cmd, payload);
     gErrorFlag = !!err;
 
     if(err) {
@@ -172,26 +177,21 @@ void Task::DispatchCommandWithResponse(const uint8_t cmd, const size_t numRespon
     Ecode_t err;
     int ret;
 
-    // ensure command is valid
-    if(cmd > static_cast<uint8_t>(CommandId::NumCommands)) {
-        Logger::Warning("Invalid cmd %02x", cmd);
-        return;
-    }
-
-    // invoke handler
-    const auto &handler = gHandlers[cmd];
-
-    if(!TestFlags(handler.flags & HandlerFlags::SupportsRead)) {
+    if(!TestFlags(gCurrentHandler->flags & HandlerFlags::SupportsRead)) {
         Logger::Warning("Cmd %02x doesn't support %s", cmd, "read");
         return;
     }
 
-    ret = handler.read(cmd, numResponseBytes, gPayloadBuffer);
+    ret = gCurrentHandler->read(cmd, numResponseBytes, gPayloadBuffer);
     gErrorFlag = (ret < 0);
 
     if(ret < 0) {
         Logger::Warning("Cmd %02x(%s) failed: %d", cmd, "read", ret);
         IrqManager::Assert(Interrupt::CommandError);
+
+        // important: invoke the post-read (with success set to "false") to avoid leaking resources
+        DispatchCommandPostRead(cmd, false);
+
         return;
     }
     REQUIRE(ret < gPayloadBuffer.size(), "invalid reply length: %d", ret);
@@ -208,6 +208,22 @@ void Task::DispatchCommandWithResponse(const uint8_t cmd, const size_t numRespon
     REQUIRE(err == ECODE_EMDRV_SPIDRV_OK, "%s failed: %d", "SPIDRV_STransmit %s", err, "response");
 }
 
+/**
+ * @brief Invoke a command's post-read routine
+ *
+ * This is called when the host has finished reading out the entire response. Handlers may perform
+ * various clean-up actions here.
+ *
+ * @param success Set when the command completed successfully
+ */
+void Task::DispatchCommandPostRead(const uint8_t cmd, const bool success) {
+    if(!TestFlags(gCurrentHandler->flags & HandlerFlags::WantsPostRead)) {
+        return;
+    }
+
+    gCurrentHandler->readComplete(cmd, success);
+}
+
 
 
 /**
@@ -222,6 +238,7 @@ void Task::ReadCommand() {
 
     // clear state
     gCommandBufferValid = false;
+    gCurrentHandler = nullptr;
 
     // read the command header
     err = SPIDRV_SReceive(sl_spidrv_eusart_host_handle, &gCommandBuffer,

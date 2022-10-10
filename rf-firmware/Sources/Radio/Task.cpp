@@ -373,6 +373,23 @@ bool Task::IsActive() {
 }
 
 /**
+ * @brief Queue an acknowledgement for a packet
+ *
+ * Read out the packet data to generate an acknowledgement for the given received frame, usually
+ * triggered after a packet has been read out. It then enqueues that to the radio task to handle
+ * formatting and transmitting the packet.
+ *
+ * @param packet Location of packet data in memory; should point to the MAC header
+ *
+ * @remark This call will queue an acknowledgement packet regardless of the "ack requested?" flag
+ *         in the MAC header; this should be ensured before calling. (Though it probably doesn't
+ *         hurt devices, it _does_ violate a reasonable expectation, so don't do it.)
+ */
+void Task::QueueAck(etl::span<const uint8_t> packet) {
+    // TODO: implement
+}
+
+/**
  * @brief Read out reset performance counters
  *
  * @param packet Packet to receive the performance counter data

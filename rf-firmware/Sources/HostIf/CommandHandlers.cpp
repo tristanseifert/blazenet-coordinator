@@ -26,70 +26,81 @@ using namespace HostIf;
 const etl::array<const Task::CommandHandler, Task::kMaxCommandId> Task::gHandlers{{
     // 0x00: NoOp
     {
-        .flags  = HandlerFlags::SupportsWrite,
-        .read   = nullptr,
-        .write  = [](auto, auto) -> int { return 0; },
+        .flags          = HandlerFlags::SupportsWrite,
+        .read           = nullptr,
+        .readComplete   = nullptr,
+        .write          = [](auto, auto) -> int { return 0; },
     },
     // 0x01: GetInfo
     {
-        .flags  = HandlerFlags::SupportsRead,
-        .read   = Handlers::GetInfo::DoRead,
-        .write  = nullptr,
+        .flags          = HandlerFlags::SupportsRead,
+        .read           = Handlers::GetInfo::DoRead,
+        .readComplete   = nullptr,
+        .write          = nullptr,
     },
     // 0x02: RadioConfig
     {
         // TODO: implement read
-        .flags  = HandlerFlags::SupportsWrite,
-        .read   = nullptr,
-        .write  = Handlers::RadioConfig::DoWrite,
+        .flags          = HandlerFlags::SupportsWrite,
+        .read           = nullptr,
+        .readComplete   = nullptr,
+        .write          = Handlers::RadioConfig::DoWrite,
     },
     // 0x03: GetStatus
     {
-        .flags  = HandlerFlags::SupportsRead,
-        .read   = Handlers::GetStatus::DoRead,
-        .write  = nullptr,
+        .flags          = HandlerFlags::SupportsRead,
+        .read           = Handlers::GetStatus::DoRead,
+        .readComplete   = nullptr,
+        .write          = nullptr,
     },
     // 0x04: IrqConfig
     {
-        .flags  = (HandlerFlags::SupportsRead | HandlerFlags::SupportsWrite),
-        .read   = Handlers::IrqConfig::DoRead,
-        .write  = Handlers::IrqConfig::DoWrite,
+        .flags          = (HandlerFlags::SupportsRead | HandlerFlags::SupportsWrite),
+        .read           = Handlers::IrqConfig::DoRead,
+        .readComplete   = nullptr,
+        .write          = Handlers::IrqConfig::DoWrite,
     },
     // 0x05: GetPacketQueueStatus
     {
-        .flags  = HandlerFlags::SupportsRead,
-        .read   = Handlers::GetPacketQueueStatus::DoRead,
-        .write  = nullptr,
+        .flags          = HandlerFlags::SupportsRead,
+        .read           = Handlers::GetPacketQueueStatus::DoRead,
+        .readComplete   = nullptr,
+        .write          = nullptr,
     },
     // 0x06: ReadPacket
     {
-        .flags  = HandlerFlags::SupportsRead,
-        .read   = Handlers::ReadPacket::DoRead,
-        .write  = nullptr,
+        .flags          = (HandlerFlags::SupportsRead | HandlerFlags::WantsPostRead),
+        .read           = Handlers::ReadPacket::DoRead,
+        .readComplete   = Handlers::ReadPacket::PostRead,
+        .write          = nullptr,
     },
     // 0x07: TransmitPacket
     {
-        .flags  = HandlerFlags::SupportsWrite,
-        .read   = nullptr,
-        .write  = Handlers::TransmitPacket::DoWrite,
+        .flags          = HandlerFlags::SupportsWrite,
+        .read           = nullptr,
+        .readComplete   = nullptr,
+        .write          = Handlers::TransmitPacket::DoWrite,
     },
     // 0x08: BeaconConfig
     {
-        .flags  = HandlerFlags::SupportsWrite,
-        .read   = nullptr,
-        .write  = Handlers::BeaconConfig::DoWrite,
+        .flags          = HandlerFlags::SupportsWrite,
+        .read           = nullptr,
+        .readComplete   = nullptr,
+        .write          = Handlers::BeaconConfig::DoWrite,
     },
     // 0x09: GetCounters
     {
-        .flags  = HandlerFlags::SupportsRead,
-        .read   = Handlers::GetCounters::DoRead,
-        .write  = nullptr,
+        .flags          = HandlerFlags::SupportsRead,
+        .read           = Handlers::GetCounters::DoRead,
+        .readComplete   = nullptr,
+        .write          = nullptr,
     },
     // 0x0A: IrqStatus
     {
-        .flags  = (HandlerFlags::SupportsRead | HandlerFlags::SupportsWrite),
-        .read   = Handlers::IrqStatus::DoRead,
-        .write  = Handlers::IrqStatus::DoWrite,
+        .flags          = (HandlerFlags::SupportsRead | HandlerFlags::SupportsWrite),
+        .read           = Handlers::IrqStatus::DoRead,
+        .readComplete   = nullptr,
+        .write          = Handlers::IrqStatus::DoWrite,
     },
 }};
 
