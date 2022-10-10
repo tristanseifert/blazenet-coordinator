@@ -5,6 +5,7 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include "Config/Reader.h"
 #include "Support/Confd.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
@@ -383,8 +384,17 @@ void Radio::initWatchdog() {
         throw std::runtime_error("failed to allocate irq watchdog event");
     }
 
+    // get interval from config
+    size_t usec{kIrqWatchdogInterval * 1000};
+
+    auto item = Config::GetConfig().at_path("radio.general.irqWatchdogInterval");
+    if(item && item.is_number()) {
+        usec = item.value_or(kIrqWatchdogInterval) * 1000;
+    }
+
+    PLOG_VERBOSE << "irq watchdog timeout: " << usec << " µS";
+
     // set the interval
-    constexpr static const auto usec = (kIrqWatchdogInterval * 1000);
     struct timeval tv{
         .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
         .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
@@ -415,7 +425,10 @@ void Radio::irqWatchdogFired() {
 
         if(*((uint8_t *) &irq)) {
             this->numLostIrqs++;
-            PLOG_WARNING << fmt::format("Lost IRQ: 0b{:08b}", *((uint8_t *) &irq));
+
+            if(kIrqWatchdogLogging) {
+                PLOG_WARNING << fmt::format("Lost IRQ: 0b{:08b}", *((uint8_t *) &irq));
+            }
         }
 
         this->irqHandlerCommon(irq);

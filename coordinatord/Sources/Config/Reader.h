@@ -8,6 +8,7 @@ namespace Config {
 void Read(const std::filesystem::path &configFile);
 
 const toml::table &GetTransportConfig();
+const toml::table &GetConfig();
 };
 
 #endif

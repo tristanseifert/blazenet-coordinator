@@ -163,12 +163,15 @@ class Radio {
 
         /// Minimum beacon interval (msec)
         constexpr static const size_t kMinBeaconInterval{1'000};
+        /// Performance counter read interval (sec)
+        constexpr static const size_t kPerfCounterReadInterval{30};
+
         /// Interrupt watchdog interval (msec)
         constexpr static const size_t kIrqWatchdogInterval{50};
         /// How long we can go without an irq (msec)
         constexpr static const size_t kIrqWatchdogThreshold{250};
-        /// Performance counter read interval (sec)
-        constexpr static const size_t kPerfCounterReadInterval{30};
+        /// Whether IRQ watchdog triggerings are logged
+        constexpr static const bool kIrqWatchdogLogging{true};
 
     public:
         Radio(const std::shared_ptr<Transports::TransportBase> &transport);

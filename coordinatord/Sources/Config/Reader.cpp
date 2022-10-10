@@ -11,6 +11,7 @@
 
 using namespace Config;
 
+static toml::table gConfig;
 static toml::table gTransportConfig;
 
 static void ReadConfd(const toml::table &);
@@ -23,6 +24,16 @@ static void ReadRadioRegion(const toml::table &);
  */
 const toml::table &Config::GetTransportConfig() {
     return gTransportConfig;
+}
+
+/**
+ * @brief Get the entire config object
+ *
+ * Return the entire deserialized config file. This is useful for various components to retrieve
+ * configuration data.
+ */
+const toml::table &Config::GetConfig() {
+    return gConfig;
 }
 
 
@@ -49,6 +60,8 @@ void Config::Read(const std::filesystem::path &configFile) {
         throw std::runtime_error(fmt::format("At line {}, column {}: {}", beg.line, beg.column,
                     err.description()));
     }
+
+    gConfig = root;
 
     // read confd connection
     const auto confd = root["confd"];
