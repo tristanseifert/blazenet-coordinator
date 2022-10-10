@@ -49,6 +49,11 @@ void Indicators::Init() {
 
     gLock = xSemaphoreCreateMutexStatic(&gLockStorage);
     REQUIRE(!!gLock, "failed to initialize %s", "indicator lock");
+
+    // set up the "self test" LED pattern (all indicators are on for 500ms)
+    SetChannelScript(Indicator::Attention, gAnimLongBlink, true);
+    SetChannelScript(Indicator::Rx, gAnimLongBlink, true);
+    SetChannelScript(Indicator::Tx, gAnimLongBlink, true);
 }
 
 /**

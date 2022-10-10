@@ -179,6 +179,13 @@ class Indicators {
             AnimCommand::TurnOff,
             AnimCommand::End,
         }};
+        /// Indicator is on for half a sec (self test)
+        constexpr static const etl::array<const uint8_t, 5> gAnimLongBlink{{
+            AnimCommand::TurnOn,
+            AnimCommand::Delay, pdMS_TO_TICKS(500),
+            AnimCommand::TurnOff,
+            AnimCommand::End,
+        }};
 
         /// Blink an indicator briefly
         constexpr static const etl::array<const uint8_t, 7> gAnimShortBlink{{
