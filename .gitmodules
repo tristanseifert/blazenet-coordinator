@@ -1,0 +1,3 @@
+[submodule "coordinatord/blazenet-device-fw"]
+	path = coordinatord/blazenet-device-fw
+	url = git@github.com:tristanseifert/blazenet-device-fw.git

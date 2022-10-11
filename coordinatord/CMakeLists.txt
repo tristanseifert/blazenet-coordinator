@@ -69,6 +69,10 @@ else()
 endif()
 
 ###############
+# Fetch the BlazeNet headers
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/blazenet-device-fw/libs/blazenet-types)
+
+###############
 # Create version file
 find_package(Git REQUIRED)
 execute_process(
@@ -108,7 +112,7 @@ endif()
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
 target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt OpenSSL::SSL
-    OpenSSL::Crypto tomlplusplus::tomlplusplus)
+    OpenSSL::Crypto tomlplusplus::tomlplusplus blazenet::types)
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
