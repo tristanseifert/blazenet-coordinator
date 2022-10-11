@@ -29,6 +29,15 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
     });
     this->initWatchdog();
 
+    // configure status polling, if configured
+    auto pollInterval = Config::GetConfig().at_path("radio.general.pollInterval");
+    if(pollInterval && pollInterval.is_number()) {
+        const auto msec = pollInterval.value_or(0);
+        if(msec) {
+            this->initPolling(std::chrono::milliseconds(msec));
+        }
+    }
+
     /*
      * Read out general information about the radio, to ensure that we can successfully
      * communicate with it, and store it for later.
@@ -86,6 +95,11 @@ Radio::~Radio() {
         event_del(this->irqWatchdog);
         event_free(this->irqWatchdog);
     }
+
+    if(this->pollTimer) {
+        event_del(this->pollTimer);
+        event_free(this->pollTimer);
+    }
 }
 
 
@@ -100,7 +114,7 @@ Radio::~Radio() {
  */
 void Radio::reloadConfig(const bool upload) {
     // channel
-    auto channel = Support::Confd::GetInteger("radio.phy.channel");
+    auto channel = Support::Confd::GetInteger(kConfPhyChannel);
     if(!channel) {
         throw std::runtime_error("failed to read `radio.phy.channel`");
     }
@@ -108,7 +122,7 @@ void Radio::reloadConfig(const bool upload) {
     this->setChannel(*channel);
 
     // transmit power (convert float dBm -> deci-dBm)
-    auto txPower = Support::Confd::GetReal("radio.phy.txPower");
+    auto txPower = Support::Confd::GetReal(kConfPhyTxPower);
     if(!txPower) {
         throw std::runtime_error("failed to read `radio.phy.txPower`");
     }
@@ -363,6 +377,52 @@ void Radio::queryCounters() {
     this->rxCounters.fifoOverflows += counters.rxRadio.fifoOverflows;
     this->rxCounters.frameErrors += counters.rxRadio.frameErrors;
     this->rxCounters.goodFrames += counters.rxRadio.goodFrames;
+}
+
+
+
+/**
+ * @brief Initialize the radio status polling timer
+ *
+ * This timer fires periodically to poll the radio's status registers, same as if an interrupt had
+ * fired. It's intended to support radios that don't (properly) implement interrupts.
+ *
+ * @param interval Polling interval, in msec
+ */
+void Radio::initPolling(const std::chrono::milliseconds interval) {
+    auto evbase = Support::EventLoop::Current()->getEvBase();
+
+    // set up the timer object
+    this->pollTimer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
+        reinterpret_cast<Radio *>(ctx)->pollTimerFired();
+    }, this);
+    if(!this->pollTimer) {
+        throw std::runtime_error("failed to allocate poll timer event");
+    }
+
+    // set the interval
+    const auto usec{interval.count() * 1000};
+    struct timeval tv{
+        .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
+        .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
+    };
+
+    evtimer_add(this->pollTimer, &tv);
+    PLOG_DEBUG << "Radio poll interval: " << usec << " µS";
+}
+
+/**
+ * @brief Radio poll timer expired
+ *
+ * Read the radio status register and act upon any pending events.
+ */
+void Radio::pollTimerFired() {
+    Transports::Response::IrqStatus irq{};
+
+    std::lock_guard lg(this->transportLock);
+    this->getPendingInterrupts(irq);
+
+    this->irqHandlerCommon(irq);
 }
 
 

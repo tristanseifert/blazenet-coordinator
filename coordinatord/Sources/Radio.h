@@ -41,6 +41,12 @@ struct TransmitPacket;
  * buffer space.)
  */
 class Radio {
+    private:
+        /// Config key for radio PHY channel
+        constexpr static const std::string_view kConfPhyChannel{"radio.phy.channel"};
+        /// Config key for radio transmit power (in dBm)
+        constexpr static const std::string_view kConfPhyTxPower{"radio.phy.txPower"};
+
     public:
         /**
          * @brief Packet priority values
@@ -275,6 +281,9 @@ class Radio {
         void counterReaderFired();
         void queryCounters();
 
+        void initPolling(const std::chrono::milliseconds interval);
+        void pollTimerFired();
+
         void initWatchdog();
         void irqWatchdogFired();
         void irqHandler();
@@ -341,6 +350,9 @@ class Radio {
         TxCounters txCounters{};
         /// RX performance counters
         RxCounters rxCounters{};
+
+        /// Radio status polling timer
+        struct event *pollTimer{nullptr};
 };
 
 #endif
