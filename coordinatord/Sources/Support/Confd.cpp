@@ -75,3 +75,28 @@ std::optional<double> Confd::GetReal(const std::string_view &key) {
 
     return temp;
 }
+
+/**
+ * @brief Read a key as a blob
+ *
+ * @param key Key name to look up
+ * @param outBuf Buffer to receive the key value
+ *
+ * @return Total number of bytes of data read, if any. A value of 0 indicates the key is empty.
+ */
+size_t Confd::GetBlob(const std::string_view key, std::span<std::byte> outBuffer) {
+    int err;
+    size_t actual{0};
+
+    err = confd_get_blob(key.data(), outBuffer.data(), outBuffer.size(), &actual);
+
+    // value is null = 0 bytes read out
+    if(err == kConfdNullValue) {
+        return 0;
+    }
+    // otherwise, translate it to an error (if key isn't found)
+    EnsureSuccess(err, fmt::format("read blob {}", key));
+
+    // return actual number of bytes read
+    return std::min(actual, outBuffer.size());
+}

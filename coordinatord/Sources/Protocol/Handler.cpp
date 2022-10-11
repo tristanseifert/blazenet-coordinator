@@ -1,6 +1,8 @@
+#include <cmath>
 #include <stdexcept>
 #include <sys/time.h>
 
+#include <BlazeNet/Types.h>
 #include <fmt/format.h>
 #include <event2/event.h>
 
@@ -22,7 +24,7 @@ Handler::Handler(const std::shared_ptr<Radio> &_radio) : radio(_radio) {
     this->reloadConfig(false);
 
     // perform initialization
-    this->initBeaconBuffer();
+    this->updateBeaconBuffer();
     this->uploadBeaconFrame(true);
 }
 
@@ -30,10 +32,6 @@ Handler::Handler(const std::shared_ptr<Radio> &_radio) : radio(_radio) {
  * @brief Clean up all resources
  */
 Handler::~Handler() {
-    if(this->beaconTimerEvent) {
-        event_del(this->beaconTimerEvent);
-        event_free(this->beaconTimerEvent);
-    }
 }
 
 
@@ -46,14 +44,23 @@ Handler::~Handler() {
  * @param upload Whether configuration is uploaded to the radio as well
  */
 void Handler::reloadConfig(const bool upload) {
-    // read the beacon config
-    auto beaconInterval = Support::Confd::GetInteger("radio.beacon.interval").value_or(5000);
+    // read the beacon interval
+    auto beaconInterval = Support::Confd::GetInteger(kConfBeaconInterval).value_or(5000);
     if(beaconInterval < kMinBeaconInterval) {
         throw std::runtime_error(fmt::format("invalid beacon interval: {} (min {})",
                     beaconInterval, kMinBeaconInterval));
     }
 
-    this->beaconInterval = std::chrono::milliseconds(beaconInterval);
+    this->beaconInterval = std::chrono::milliseconds(
+            static_cast<size_t>(std::ceil(beaconInterval / 10.) * 10));
+    PLOG_VERBOSE << "Beacon interval: " << this->beaconInterval.count() << " ms";
+
+    // read the network UUID
+    const auto idBytesRead = Support::Confd::GetBlob(kConfBeaconId, this->networkId);
+    if(idBytesRead != this->networkId.size()) {
+        throw std::runtime_error(fmt::format("failed to read network id (`{}`): got {} bytes",
+                    kConfBeaconId, idBytesRead));
+    }
 
     // upload config to radio if needed
     if(upload) {
@@ -64,19 +71,50 @@ void Handler::reloadConfig(const bool upload) {
 
 
 /**
- * @brief Initialize the beacon frame
+ * @brief Generate the beacon frame
  *
- * This sets up the common part of the beacon frame that doesn't change.
+ * Regenerate the beacon frame buffer.
  */
-void Handler::initBeaconBuffer() {
+void Handler::updateBeaconBuffer() {
     using namespace std::chrono_literals;
 
-    // TODO: implement this properly
-    this->beaconBuffer.resize(16);
-    this->beaconBuffer[0] = std::byte{0x0f};
+    // figure out how big we need for the basic MAC and beacon header
+    constexpr static const size_t kPayloadBaseBytes{
+        sizeof(BlazeNet::Types::Mac::Header) + sizeof(BlazeNet::Types::Beacon::Header)
+    };
 
-    const char *buf = "smoke weed 420";
-    memcpy(this->beaconBuffer.data() + 1, buf, 14);
+    this->beaconBuffer.resize(sizeof(BlazeNet::Types::Phy::Header) + kPayloadBaseBytes);
+    std::fill(this->beaconBuffer.begin(), this->beaconBuffer.end(), std::byte(0));
+
+    // prepare PHY header
+    auto phyHdr = reinterpret_cast<BlazeNet::Types::Phy::Header *>(this->beaconBuffer.data());
+
+    // build MAC header (XXX: proper PHY header offset)
+    auto macHdr = reinterpret_cast<BlazeNet::Types::Mac::Header *>(phyHdr->payload);
+
+    macHdr->flags = BlazeNet::Types::Mac::HeaderFlags::EndpointNetControl;
+    macHdr->sequence = 0;
+    macHdr->source = this->radio->getAddress();
+    macHdr->destination = BlazeNet::Types::Mac::kBroadcastAddress;
+
+    // build beacon header
+    auto beaconHdr = reinterpret_cast<BlazeNet::Types::Beacon::Header *>(phyHdr->payload
+            + sizeof(*macHdr));
+    beaconHdr->version = BlazeNet::Types::kProtocolVersion;
+
+    if(this->inBandPairingEnabled) {
+        beaconHdr->flags |= BlazeNet::Types::Beacon::HeaderFlags::PairingEnable;
+    }
+
+    memcpy(beaconHdr->id, this->networkId.data(), sizeof(beaconHdr->id));
+
+    // TODO: bonus beacon headers (pending traffic map, etc.)
+
+    // fill in PHY header with the final length
+    if(this->beaconBuffer.size() > 0xff) {
+        throw std::runtime_error(fmt::format("beacon too large: {}", this->beaconBuffer.size()));
+    }
+    this->beaconBuffer[0] = std::byte(this->beaconBuffer.size() - 1);
 }
 
 /**
@@ -93,33 +131,4 @@ void Handler::uploadBeaconFrame(const bool frameChanged) {
     } else {
         this->radio->setBeaconConfig(true, this->beaconInterval);
     }
-}
-
-/**
- * @brief Set up a periodic timer to trigger beacon frame transmissions
- */
-void Handler::initBeaconTimer() {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
-    this->beaconTimerEvent = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Handler *>(ctx)->sendBeacon();
-    }, this);
-    if(!this->beaconTimerEvent) {
-        throw std::runtime_error("failed to allocate beacon event");
-    }
-
-    // set the interval
-    const size_t usec = 5'000'000;
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
-        .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
-    };
-
-    evtimer_add(this->beaconTimerEvent, &tv);
-}
-
-/**
- * @brief Transmit a beacon frame.
- */
-void Handler::sendBeacon() {
-    this->radio->queueTransmitPacket(Radio::PacketPriority::NetworkControl, this->beaconBuffer);
 }

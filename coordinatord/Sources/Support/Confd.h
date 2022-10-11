@@ -1,7 +1,9 @@
 #ifndef SUPPORT_CONFD_H
 #define SUPPORT_CONFD_H
 
+#include <cstddef>
 #include <optional>
+#include <span>
 #include <string_view>
 
 namespace Support {
@@ -17,6 +19,7 @@ class Confd {
 
         static std::optional<int64_t> GetInteger(const std::string_view &key);
         static std::optional<double> GetReal(const std::string_view &key);
+        static size_t GetBlob(const std::string_view key, std::span<std::byte> outBuffer);
 
     private:
         Confd() = delete;

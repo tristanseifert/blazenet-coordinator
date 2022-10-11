@@ -210,6 +210,13 @@ class Radio {
             this->isConfigDirty = true;
         }
 
+        /**
+         * @brief Get our short (MAC) address
+         */
+        inline constexpr auto getAddress() const {
+            return this->currentShortAddress;
+        }
+
         void uploadConfig();
 
         void queueTransmitPacket(const PacketPriority priority,
@@ -329,6 +336,8 @@ class Radio {
 
         /// Channel number to communicate on
         uint16_t currentChannel{0xffff};
+        /// Short MAC address of the coordinator
+        uint16_t currentShortAddress{0};
 
         /// Maximum supported transmit power (in ⅒th dBm)
         uint16_t maxTxPower;

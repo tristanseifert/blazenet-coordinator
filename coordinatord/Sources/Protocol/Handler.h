@@ -1,9 +1,11 @@
 #ifndef PROTOCOL_HANDLER_H
 #define PROTOCOL_HANDLER_H
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 class Radio;
@@ -17,6 +19,12 @@ namespace Protocol {
  * been received.
  */
 class Handler {
+    private:
+        /// Config key for beacon interval (in ms)
+        constexpr static const std::string_view kConfBeaconInterval{"radio.beacon.interval"};
+        /// Config key for network id
+        constexpr static const std::string_view kConfBeaconId{"radio.beacon.id"};
+
     public:
         /**
          * @brief Minimum beacon interval (msec)
@@ -30,11 +38,8 @@ class Handler {
         void reloadConfig(const bool upload);
 
     private:
-        void initBeaconBuffer();
+        void updateBeaconBuffer();
         void uploadBeaconFrame(const bool frameChanged);
-
-        void initBeaconTimer();
-        void sendBeacon();
 
     private:
         /// Underlying radio we're communicating with
@@ -42,10 +47,13 @@ class Handler {
 
         /// Beacon interval
         std::chrono::milliseconds beaconInterval{0};
-        /// timer event for beacon frames
-        struct event *beaconTimerEvent{nullptr};
+        /// Network identifier
+        std::array<std::byte, 16> networkId;
         /// Buffer for beacon frames
         std::vector<std::byte> beaconBuffer;
+
+        /// Is pairing of new devices over-the-air enabled?
+        bool inBandPairingEnabled{false};
 };
 }
 

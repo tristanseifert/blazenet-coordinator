@@ -135,6 +135,15 @@ void Radio::reloadConfig(const bool upload) {
 
     // TODO: set regulatory domain
 
+    // radio short address (from config file)
+    auto item = Config::GetConfig().at_path("network.addresses.mine");
+    if(!item || !item.is_number()) {
+        throw std::runtime_error("invalid coordinator address (key `network.addresses.mine`)");
+    }
+
+    this->currentShortAddress = item.value_or(0);
+    PLOG_DEBUG << "Coordinator address: " << fmt::format("${:04x}", this->currentShortAddress);
+
     // upload to radio if requested
     if(upload) {
         this->uploadConfig();
@@ -153,6 +162,7 @@ void Radio::uploadConfig() {
 
     conf.channel = this->currentChannel;
     conf.txPower = this->currentTxPower;
+    conf.myAddress = this->currentShortAddress;
 
     // then submit it
     std::lock_guard lg(this->transportLock);

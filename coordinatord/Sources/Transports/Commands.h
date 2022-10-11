@@ -413,6 +413,14 @@ struct RadioConfig {
      * lower transmit power.
      */
     uint16_t txPower;
+
+    /**
+     * @brief Radio short address
+     *
+     * 16-bit short address of the coordinator node; used for filtering of auto-ack messages and
+     * when generating internal frames.
+     */
+    uint16_t myAddress;
 } __attribute__((packed));
 
 /**
