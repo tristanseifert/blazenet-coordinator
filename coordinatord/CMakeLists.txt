@@ -92,6 +92,7 @@ add_executable(daemon
     Sources/Main.cpp
     Sources/Radio.cpp
     Sources/Protocol/Handler.cpp
+    Sources/Protocol/Beaconator.cpp
     Sources/Config/Reader.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp

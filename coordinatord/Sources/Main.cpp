@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
 
         auto radio = std::make_shared<Radio>(transport);
 
-        // set up packet handler
+        // set up protocol handler
         gHandler = std::make_shared<Protocol::Handler>(radio);
     } catch(const std::exception &e) {
         PLOG_FATAL << "Initialization failed: " << e.what();
