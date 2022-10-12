@@ -14,6 +14,7 @@
 #include "Config/Reader.h"
 #include "Drivers/Init.h"
 #include "Drivers/Display/Base.h"
+#include "Gui/DisplayManager.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -22,6 +23,9 @@
 std::atomic_bool gRun{true};
 /// Main run loop
 static std::shared_ptr<Support::EventLoop> gMainLoop;
+
+/// GUI display manager: draws the UI
+static std::shared_ptr<Gui::DisplayManager> gGuiDispMan;
 
 /// Command line configuration
 static struct {
@@ -33,6 +37,8 @@ static struct {
     /// Use the short log format (omit timestamps)
     bool logShortFormat{false};
 } gCliConfig;
+
+
 
 /**
  * @brief Parse the command line
@@ -115,6 +121,8 @@ int main(int argc, char **argv) {
     PLOG_INFO << "Starting blazeguid version " << kVersion << " (" << kVersionGitHash << ")";
 
     // initialize the event loop, then do config initialization
+    Support::Watchdog::Init();
+
     gMainLoop = std::make_shared<Support::EventLoop>(true);
     gMainLoop->arm();
 
@@ -134,6 +142,10 @@ int main(int argc, char **argv) {
         if(disp) {
             PLOG_INFO << fmt::format("Display size: {} ✕ {}", disp->getWidth(), disp->getHeight());
 
+            // set up the GUI drawing boi and draw initial frame
+            gGuiDispMan = std::make_shared<Gui::DisplayManager>(disp);
+            gGuiDispMan->forceDraw();
+
             // enable display
             disp->setEnabled(true);
         }
@@ -147,6 +159,8 @@ int main(int argc, char **argv) {
 
     // clean up
     PLOG_DEBUG << "Shutting down…";
+
+    gGuiDispMan.reset();
 
     Drivers::CleanUp();
 

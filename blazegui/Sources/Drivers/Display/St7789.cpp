@@ -87,7 +87,7 @@ void St7789::initSpidev(const toml::table &config) {
 
     // get the max baud rate
     const uint32_t speed = config.at_path("transport.max-speed").value_or(kDefaultSpiRate);
-    PLOG_DEBUG << "SPI rate: " << speed << " Hz";
+    PLOG_DEBUG << "SPI rate: " << speed / 1000. << " kHz";
 
     // open device
     const std::string path = config.at_path("transport.device").value_or("(null)");
@@ -315,7 +315,7 @@ void St7789::initDisplay() {
     this->sendCommand(Command::SleepOut);
     usleep(120 * 1000);
 
-    // transfer display buffer
+    // transfer display buffer (so there's something reasonable in it)
     this->transferBuffer();
 }
 

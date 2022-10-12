@@ -1,0 +1,13 @@
+# SPI display
+KERNEL=="spidev1.0", OWNER="blazegui", GROUP="daemon", MODE="0600"
+# GPIO port I (display control lines)
+KERNEL=="gpiochip8", OWNER="blazegui", GROUP="daemon", MODE="0600"
+
+# backlights are also supported to be used by blazegui
+KERNEL=="backlight", OWNER="blazegui", GROUP="daemon", MODE="0600"
+
+# same for the LEDs
+SUBSYSTEM=="leds", ACTION=="add", RUN+="/bin/chown -R blazegui /sys%p", RUN+="/bin/chmod -R g=u /sys%p"
+
+# also, allow it to access the input events device
+KERNEL=="event*", NAME="input/%k", OWNER="blazegui", GROUP="daemon", MODE:="0600"

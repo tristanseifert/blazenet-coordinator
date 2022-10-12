@@ -1,0 +1,22 @@
+[Unit]
+Description=User interface daemon
+After=local-fs.target sysinit.target systemd-udevd.service
+Wants=confd.service
+
+[Service]
+ExecStart=/usr/sbin/blazeguid --config=/usr/etc/blazegui.toml --log-simple
+Type=notify
+WatchdogSec=10
+Restart=on-failure
+RestartSec=5
+User=blazegui
+Group=daemon
+PrivateTmp=true
+
+# create the socket directory (as root)
+PermissionsStartOnly=true
+ExecStartPre=-/bin/mkdir /var/run/blazegui
+ExecStartPre=/bin/chown -R blazegui:daemon /var/run/blazegui/
+
+[Install]
+WantedBy=basic.target

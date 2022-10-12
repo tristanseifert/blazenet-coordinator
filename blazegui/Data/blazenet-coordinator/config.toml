@@ -12,7 +12,7 @@ rotation = 0
 
 [display.transport]
 device = "/dev/spidev1.0"
-max-speed = 5000000
+max-speed = 10000000
 
 cs-gpio = "gpiochip8:7"
 reset-gpio = "gpiochip8:6"

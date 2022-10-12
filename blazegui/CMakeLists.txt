@@ -42,6 +42,33 @@ link_directories(${PKG_LIBCBOR_LIBRARY_DIRS})
 pkg_search_module(PKG_LIBEVENT REQUIRED libevent)
 link_directories(${PKG_LIBEVENT_LIBRARY_DIRS})
 
+pkg_search_module(PKG_FREETYPE REQUIRED freetype2)
+link_directories(${PKG_FREETYPE_LIBRARY_DIRS})
+include_directories(${PKG_FREETYPE_INCLUDE_DIRS})
+
+pkg_search_module(PKG_CAIRO REQUIRED cairo)
+link_directories(${PKG_CAIRO_LIBRARY_DIRS})
+include_directories(${PKG_CAIRO_INCLUDE_DIRS})
+
+pkg_search_module(PKG_HARFBUZZ REQUIRED harfbuzz)
+link_directories(${PKG_HARFBUZZ_LIBRARY_DIRS})
+include_directories(${PKG_HARFBUZZ_INCLUDE_DIRS})
+
+pkg_search_module(PKG_PANGO REQUIRED pango)
+link_directories(${PKG_PANGO_LIBRARY_DIRS})
+include_directories(${PKG_PANGO_INCLUDE_DIRS})
+pkg_search_module(PKG_PANGOCAIRO REQUIRED pangocairo)
+link_directories(${PKG_PANGOCAIRO_LIBRARY_DIRS})
+include_directories(${PKG_PANGOCAIRO_INCLUDE_DIRS})
+
+# glib is a dependency of harfbuzz and pango
+pkg_search_module(PKG_GLIB2 REQUIRED glib-2.0)
+link_directories(${PKG_GLIB2_LIBRARY_DIRS})
+include_directories(${PKG_GLIB2_INCLUDE_DIRS})
+pkg_search_module(PKG_GOBJECT2 REQUIRED gobject-2.0)
+link_directories(${PKG_GOBJECT2_LIBRARY_DIRS})
+include_directories(${PKG_GOBJECT2_INCLUDE_DIRS})
+
 # these libraries may be externally provided
 if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
@@ -90,6 +117,7 @@ add_executable(daemon
     Sources/Config/Reader.cpp
     Sources/Drivers/Init.cpp
     Sources/Drivers/Display/St7789.cpp
+    Sources/Gui/DisplayManager.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
@@ -103,6 +131,10 @@ target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIB
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
 
 target_link_libraries(daemon PRIVATE gpiod)
+
+target_link_libraries(daemon PUBLIC ${PKG_FREETYPE_LIBRARIES} ${PKG_CAIRO_LIBRARIES}
+    ${PKG_HARFBUZZ_LIBRARIES} ${PKG_PANGO_LIBRARIES} ${PKG_PANGOCAIRO_LIBRARIES}
+    ${PKG_GLIB2_LIBRARIES} ${PKG_GOBJECT2_LIBRARIES})
 
 # add confd support (if the system has the support library)
 find_library(LIB_CONFD confd)
