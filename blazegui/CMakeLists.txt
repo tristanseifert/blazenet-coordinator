@@ -88,6 +88,8 @@ add_executable(daemon
     ${VERSION_FILE}
     Sources/Main.cpp
     Sources/Config/Reader.cpp
+    Sources/Drivers/Init.cpp
+    Sources/Drivers/Display/St7789.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp

@@ -12,6 +12,8 @@
 
 #include "version.h"
 #include "Config/Reader.h"
+#include "Drivers/Init.h"
+#include "Drivers/Display/Base.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -124,11 +126,26 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // set up the drivers (based on config)
+    try {
+        Drivers::Init();
+
+        auto &disp = Drivers::GetDisplayDriver();
+        if(disp) {
+            PLOG_INFO << fmt::format("Display size: {} ✕ {}", disp->getWidth(), disp->getHeight());
+        }
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Failed to initialize drivers: " << e.what();
+        return 1;
+    }
+
     // run the event loop on the main thread
     RunMainLoop();
 
     // clean up
     PLOG_DEBUG << "Shutting down…";
+
+    Drivers::CleanUp();
 
     gMainLoop.reset();
 

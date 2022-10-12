@@ -55,6 +55,23 @@ class Gpio {
 
             return line;
         }
+
+        /**
+         * @brief Set the state of an IO line
+         *
+         * @param line Line to change the state of
+         * @param state New state to apply to the line
+         * @param desc Optional description for this IO line operation (for error messages)
+         *
+         * @throw std::system_error If IO operation failed
+         */
+        static void SetState(struct gpiod_line *line, const int state,
+                const char *desc = "change gpio state") {
+            int err = gpiod_line_set_value(line, state);
+            if(err) {
+                throw std::system_error(errno, std::generic_category(), desc);
+            }
+        }
 };
 }
 
