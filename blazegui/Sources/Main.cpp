@@ -133,6 +133,9 @@ int main(int argc, char **argv) {
         auto &disp = Drivers::GetDisplayDriver();
         if(disp) {
             PLOG_INFO << fmt::format("Display size: {} ✕ {}", disp->getWidth(), disp->getHeight());
+
+            // enable display
+            disp->setEnabled(true);
         }
     } catch(const std::exception &e) {
         PLOG_FATAL << "Failed to initialize drivers: " << e.what();

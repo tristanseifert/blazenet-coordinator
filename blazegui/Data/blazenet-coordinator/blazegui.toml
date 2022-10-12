@@ -8,7 +8,7 @@ socket = "/var/run/confd/rpc.sock"
 [display]
 driver = "st7789"
 size = [240, 240]
-rotation = 180
+rotation = 0
 
 [display.transport]
 device = "/dev/spidev1.0"

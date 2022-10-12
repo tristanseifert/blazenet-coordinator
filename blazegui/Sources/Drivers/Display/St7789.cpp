@@ -70,6 +70,10 @@ void St7789::initSize(const toml::table &config) {
                         this->height));
         }
     }
+
+    // allocate the framebuffer
+    this->buffer.resize(this->width * 2 * this->height);
+    this->drawTestPattern();
 }
 
 /**
@@ -205,14 +209,14 @@ St7789::~St7789() {
  * @param wait Whether to wait after resetting the display
  */
 void St7789::reset(const bool wait) {
-    int err;
+    // de-assert chip select and command strobe
+    Support::Gpio::SetState(this->gpioSelect, 1, "deassert chip select");
+    Support::Gpio::SetState(this->gpioDataCmd, 1, "assert data");
 
     // assert reset
     Support::Gpio::SetState(this->gpioReset, 0, "assert reset");
-
     // wait
     usleep(1000 * 1);
-
     // deassert reset
     Support::Gpio::SetState(this->gpioReset, 1, "deassert reset");
 
@@ -245,12 +249,25 @@ void St7789::sendCommand(const uint8_t cmd, std::span<const uint8_t> payload) {
     if(!payload.empty()) {
         Support::Gpio::SetState(this->gpioDataCmd, 1, "assert data");
 
-        err = write(this->spiFd, payload.data(), payload.size());
-        if(err == -1) {
-            throw std::system_error(errno, std::generic_category(), "write payload");
-        } else if(err != payload.size()) {
-            throw std::runtime_error(fmt::format("partial data write: {} of {}", err,
-                        payload.size()));
+        // split the payload into 4K chunks
+        // XXX: can we make this better if the SPI driver supports larger transfers?
+        constexpr static const size_t kChunkSize{4096};
+        size_t offset{0};
+        while(offset < payload.size()) {
+            // get this chunk
+            auto chunk = payload.subspan(offset, std::min(payload.size() - offset, kChunkSize));
+
+            // write it
+            err = write(this->spiFd, chunk.data(), chunk.size());
+            if(err == -1) {
+                throw std::system_error(errno, std::generic_category(), "write payload");
+            } else if(err != chunk.size()) {
+                throw std::runtime_error(fmt::format("partial data write: {} of {}", err,
+                            chunk.size()));
+            }
+
+            // update for next transfer
+            offset += chunk.size();
         }
     }
 
@@ -265,7 +282,7 @@ void St7789::initDisplay() {
     // Memory data access control (based on rotation)
     this->sendCommand(0x36, {{0x00}}); // or 0x70
     // Interface pixel format: 16bpp
-    this->sendCommand(0x3A, {{0x05}});
+    this->sendCommand(Command::PixelFormat, {{0x05}});
     // Porch control
     this->sendCommand(0xB2, {{0x0C, 0x0C, 0x00, 0x33, 0x33}});
     // Gate control
@@ -278,24 +295,83 @@ void St7789::initDisplay() {
     this->sendCommand(0xC2, {{0x01}});
     // VRH set
     this->sendCommand(0xC3, {{0x12}});
-    /// VDV set
+    // VDV set
     this->sendCommand(0xC4, {{0x20}});
     // Frame rate control
     this->sendCommand(0xC6, {{0x0F}});
     // Power control 1
     this->sendCommand(0xD0, {{0xA4, 0xA1}});
     // Positive voltage gamma
-    this->sendCommand(0xE0, {{0XD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54, 0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23}});
+    this->sendCommand(Command::GammaPos, {{0XD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54,
+            0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23}});
     // Negative voltage gamma
-    this->sendCommand(0xE1, {{0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44, 0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23}});
+    this->sendCommand(Command::GammaNeg, {{0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44,
+            0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23}});
 
-    // display inversion on
-    this->sendCommand(0x21);
+    // display inversion off
+    this->sendCommand(Command::InvertOn);
 
     // sleep out
-    this->sendCommand(0x11);
+    this->sendCommand(Command::SleepOut);
     usleep(120 * 1000);
 
-    // display on
-    this->sendCommand(0x29);
+    // transfer display buffer
+    this->transferBuffer();
+}
+
+/**
+ * @brief Set the display position
+ *
+ * This is used for the next "memory write" command.
+ */
+void St7789::setPosition(const std::pair<uint16_t, uint16_t> &start,
+        const std::pair<uint16_t, uint16_t> &end) {
+    this->sendCommand(Command::ColumnAddrSet, {{
+        static_cast<uint8_t>(start.first >> 8), static_cast<uint8_t>(start.first & 0xFF),
+        static_cast<uint8_t>(end.first >> 8),   static_cast<uint8_t>(end.first & 0xFF),
+    }});
+
+    this->sendCommand(Command::RowAddrSet, {{
+        static_cast<uint8_t>(start.second >> 8), static_cast<uint8_t>(start.second & 0xFF),
+        static_cast<uint8_t>(end.second >> 8),   static_cast<uint8_t>(end.second & 0xFF),
+    }});
+}
+
+
+
+/**
+ * @brief Draw a test pattern
+ *
+ * This has red, green, blue, and then a grey color gradient from top to bottom.
+ */
+void St7789::drawTestPattern() {
+    uint16_t temp;
+
+    for(size_t y = 0; y < this->height; y++) {
+        const size_t yOff = y * this->getFramebufferStride();
+
+        for(size_t x = 0; x < this->width; x++) {
+            // red
+            if(y < 60) {
+                temp = ((x >> 2) & 0x1f) << 11;
+            }
+            // grün
+            else if(y >= 60 && y < 120) {
+                temp = ((x >> 1) & 0x3f) << 5;
+            }
+            // blau
+            else if(y >= 120 && y < 180) {
+                temp = ((x >> 2) & 0x1f) << 0;
+            }
+            // grey
+            else {
+                temp = (((x >> 2) & 0x1f) << 11) | (((x >> 1) & 0x3f) << 5) |
+                    (((x >> 2) & 0x1f) << 0);
+
+            }
+
+            this->buffer[yOff + (x * 2) + 0] = temp >> 8;
+            this->buffer[yOff + (x * 2) + 1] = temp & 0xff;
+        }
+    }
 }

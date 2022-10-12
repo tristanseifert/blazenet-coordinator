@@ -2,6 +2,9 @@
 #define DRIVERS_DISPLAY_BASE_H
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 #include <stdexcept>
 
 #include <toml++/toml.h>
@@ -31,10 +34,20 @@ class Base {
         virtual ~Base() = default;
 
 
+
+        /// @{ @name Power & Control
         /**
          * @brief Reset the display controller
          */
         virtual void reset() = 0;
+
+        /**
+         * @brief Set whether the display is enabled
+         *
+         * When a display is disabled, it does not show its framebuffer contents.
+         */
+        virtual void setEnabled(const bool enable) = 0;
+        /// @}
 
         /// @{ @name Dimensions
         /**
@@ -78,6 +91,35 @@ class Base {
         virtual void setBacklight(const float brightness) {
             throw std::logic_error("not supported");
         }
+        /// @}
+
+        /// @{ @name Framebuffer support
+        /**
+         * @brief Transfer the display buffer
+         *
+         * Perform an IO to send the current framebuffer contents to the display and make them
+         * visible.
+         */
+        virtual void transferBuffer() = 0;
+
+        /**
+         * @brief Get the display internal framebuffer
+         *
+         * This is a buffer that may be drawn to.
+         */
+        virtual std::span<uint8_t> getFramebuffer() = 0;
+
+        /**
+         * @brief Get bits per pixel
+         */
+        virtual size_t getBitsPerPixel() const = 0;
+
+        /**
+         * @brief Get the framebuffer stride
+         *
+         * This is the number of bytes per row of pixels.
+         */
+        virtual size_t getFramebufferStride() const = 0;
         /// @}
 };
 }

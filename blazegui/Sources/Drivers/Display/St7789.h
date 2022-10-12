@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <utility>
+#include <vector>
 
 #include "Base.h"
 
@@ -15,6 +17,21 @@ namespace Drivers::Display {
  */
 class St7789: public Base {
     private:
+        enum Command: uint8_t {
+            SleepOut                    = 0x11,
+            InvertOff                   = 0x20,
+            InvertOn                    = 0x21,
+            DisplayOff                  = 0x28,
+            DisplayOn                   = 0x29,
+            ColumnAddrSet               = 0x2A,
+            RowAddrSet                  = 0x2B,
+            WriteVRAM                   = 0x2C,
+            PixelFormat                 = 0x3A,
+            GammaPos                    = 0xE0,
+            GammaNeg                    = 0xE1,
+        };
+
+    private:
         /// Default SPI frequency (in Hz)
         constexpr static const size_t kDefaultSpiRate{1'000'000};
 
@@ -25,6 +42,17 @@ class St7789: public Base {
     public:
         void reset() override {
             this->reset(true);
+        }
+
+        /**
+         * Send the display on or display off command, depending on the flag.
+         */
+        void setEnabled(const bool enable) override {
+            if(enable) {
+                this->sendCommand(Command::DisplayOn);
+            } else {
+                this->sendCommand(Command::DisplayOff);
+            }
         }
 
         size_t getWidth() const override {
@@ -41,6 +69,22 @@ class St7789: public Base {
             return (this->backlightFd != -1);
         }
 
+        void transferBuffer() override {
+            this->writeVram({0, 0}, {this->width, this->height}, this->getFramebuffer());
+        }
+        /// Framebuffer is stored as a vector (allocated once size is known)
+        std::span<uint8_t> getFramebuffer() override {
+            return this->buffer;
+        }
+        /// We always use a 16bpp framebuffer
+        size_t getBitsPerPixel() const override {
+            return 16;
+        }
+        /// Our buffer will always be tightly packed
+        size_t getFramebufferStride() const override {
+            return this->width * 2;
+        }
+
     private:
         void initSize(const toml::table &);
         void initSpidev(const toml::table &);
@@ -50,6 +94,36 @@ class St7789: public Base {
         void sendCommand(const uint8_t cmd, std::span<const uint8_t> payload = {});
 
         void initDisplay();
+
+        void setPosition(const std::pair<uint16_t, uint16_t> &start,
+                const std::pair<uint16_t, uint16_t> &end);
+
+        /**
+         * @brief Write to VRAM
+         *
+         * Data is written to the previously set location.
+         *
+         * @param buffer Data to write to VRAM
+         */
+        inline void writeVram(std::span<const uint8_t> buffer) {
+            this->sendCommand(Command::WriteVRAM, buffer);
+        }
+        /**
+         * @brief Write to VRAM
+         *
+         * Write the data to the specified window in VRAM.
+         *
+         * @param start Starting position of data write
+         * @param end Ending position of data write
+         * @param buffer Data to write to VRAM
+         */
+        inline void writeVram(const std::pair<uint16_t, uint16_t> &start,
+                const std::pair<uint16_t, uint16_t> &end, std::span<const uint8_t> buffer) {
+            this->setPosition(start, end);
+            this->writeVram(buffer);
+        }
+
+        void drawTestPattern();
 
     private:
         /// Pixel dimensions of the display
@@ -71,6 +145,9 @@ class St7789: public Base {
         struct gpiod_line *gpioReset{nullptr};
         /// D/C GPIO
         struct gpiod_line *gpioDataCmd{nullptr};
+
+        /// Framebuffer memory
+        std::vector<uint8_t> buffer;
 };
 };
 
