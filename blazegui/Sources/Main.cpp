@@ -1,6 +1,8 @@
 #include <getopt.h>
 #include <unistd.h>
+
 #include <event2/event.h>
+#include <fmt/format.h>
 
 #include <atomic>
 #include <filesystem>
@@ -9,6 +11,7 @@
 #include <stdexcept>
 
 #include "version.h"
+#include "Config/Reader.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -113,7 +116,13 @@ int main(int argc, char **argv) {
     gMainLoop = std::make_shared<Support::EventLoop>(true);
     gMainLoop->arm();
 
-    // TODO: read config
+    // read config
+    try {
+        Config::Read(gCliConfig.configFilePath);
+    } catch(const std::exception &e) {
+        PLOG_FATAL << "Failed to parse config file: " << e.what();
+        return 1;
+    }
 
     // run the event loop on the main thread
     RunMainLoop();

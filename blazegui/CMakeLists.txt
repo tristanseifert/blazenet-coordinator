@@ -87,6 +87,7 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/Sources/version.c.in ${VERSION_FILE} @O
 add_executable(daemon
     ${VERSION_FILE}
     Sources/Main.cpp
+    Sources/Config/Reader.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
@@ -98,6 +99,8 @@ target_link_libraries(daemon PRIVATE plog::plog fmt::fmt tomlplusplus::tomlplusp
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})
+
+target_link_libraries(daemon PRIVATE gpiod)
 
 # add confd support (if the system has the support library)
 find_library(LIB_CONFD confd)
