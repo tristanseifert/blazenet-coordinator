@@ -1,10 +1,12 @@
 #include <cairo.h>
+#include <event2/event.h>
 
 #include <fmt/format.h>
 
 #include <stdexcept>
 
 #include "Drivers/Display/Base.h"
+#include "Support/EventLoop.h"
 #include "Support/Logging.h"
 
 #include "DisplayManager.h"
@@ -46,12 +48,33 @@ DisplayManager::DisplayManager(const std::shared_ptr<Drivers::Display::Base> &di
     // clear the background
     cairo_set_source_rgb(this->ctx, 0.33, 0.33, 1);
     cairo_paint(this->ctx);
+
+    // set up a timer to periodically redraw the display
+    auto evbase = Support::EventLoop::Current()->getEvBase();
+    this->redrawTimer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
+        reinterpret_cast<DisplayManager *>(ctx)->draw();
+    }, this);
+    if(!this->redrawTimer) {
+        throw std::runtime_error("failed to allocate redraw timer");
+    }
+
+    struct timeval tv{
+        .tv_sec  = static_cast<time_t>(kRedrawInterval / 1'000'000U),
+        .tv_usec = static_cast<suseconds_t>(kRedrawInterval % 1'000'000U),
+    };
+
+    evtimer_add(this->redrawTimer, &tv);
 }
 
 /**
  * @brief Clean up drawing context
  */
 DisplayManager::~DisplayManager() {
+    if(this->redrawTimer) {
+        event_del(this->redrawTimer);
+        event_free(this->redrawTimer);
+    }
+
     cairo_destroy(this->ctx);
     cairo_surface_destroy(this->surface);
 }

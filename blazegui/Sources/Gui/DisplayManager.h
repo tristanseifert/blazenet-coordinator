@@ -14,6 +14,10 @@ namespace Gui {
  * This dude handles rendering stuff to the display.
  */
 class DisplayManager {
+    private:
+        /// Display redraw interval (µsec)
+        constexpr static const size_t kRedrawInterval{100 * 1000};
+
     public:
         DisplayManager(const std::shared_ptr<Drivers::Display::Base> &display);
         ~DisplayManager();
@@ -27,7 +31,14 @@ class DisplayManager {
             this->draw(true);
         }
 
-        void draw(const bool force);
+        /**
+         * @brief Set the dirty flag
+         */
+        void setNeedsDisplay() {
+            this->dirty = true;
+        }
+
+        void draw(const bool force = false);
 
     private:
         /// Set whenever the display needs a redraw
@@ -40,6 +51,9 @@ class DisplayManager {
         struct _cairo_surface *surface{nullptr};
         /// Cairo drawing context
         struct _cairo *ctx{nullptr};
+
+        /// Display redraw timer
+        struct event *redrawTimer{nullptr};
 };
 }
 
