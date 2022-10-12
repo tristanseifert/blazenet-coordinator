@@ -1,0 +1,42 @@
+################################################################################
+# blazegui config (for blazenet-coordinator rev1)
+################################################################################
+[confd]
+socket = "/var/run/confd/rpc.sock"
+
+################################################################################
+[display]
+driver = "st7789"
+size = [240, 240]
+rotation = 180
+
+[display.transport]
+device = "/dev/spidev1.0"
+max-speed = 5000000
+
+cs-gpio = "gpiochip8:7"
+reset-gpio = "gpiochip8:6"
+dc-gpio = "gpiochip8:5"
+
+[display.backlight]
+path = "/sys/class/backlight/backlight/brightness"
+
+################################################################################
+[buttons]
+event = "/dev/input/by-path/platform-gpio-keys-event"
+
+[[buttons.mapping]]
+keycode = 96
+type = "select"
+
+[[buttons.mapping]]
+keycode = 57
+type = "scroll"
+
+################################################################################
+[leds]
+[leds.status]
+type = "rgb"
+files = ["/sys/class/leds/blazer:red:status/brightness",
+    "/sys/class/leds/blazer:green:status/brightness",
+    "/sys/class/leds/blazer:blue:status/brightness"]
