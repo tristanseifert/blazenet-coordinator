@@ -13,11 +13,12 @@
 #include "version.h"
 #include "Config/Reader.h"
 #include "Protocol/Handler.h"
-#include "Transports/Base.h"
+#include "Rpc/Server.h"
 #include "Support/Confd.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
+#include "Transports/Base.h"
 
 /// Set for as long as we should continue processing requests
 std::atomic_bool gRun{true};
@@ -25,6 +26,8 @@ std::atomic_bool gRun{true};
 static std::shared_ptr<Support::EventLoop> gMainLoop;
 /// Packet handler
 static std::shared_ptr<Protocol::Handler> gHandler;
+/// Local RPC server
+static std::shared_ptr<Rpc::Server> gLocalRpc;
 
 /// Command line configuration
 static struct {
@@ -120,6 +123,8 @@ int main(int argc, char **argv) {
     PLOG_INFO << "Starting blazed version " << kVersion << " (" << kVersionGitHash << ")";
 
     // initialize the event loop, then do config initialization
+    Support::Watchdog::Init();
+
     gMainLoop = std::make_shared<Support::EventLoop>(true);
     gMainLoop->arm();
 
@@ -148,6 +153,9 @@ int main(int argc, char **argv) {
 
         // set up protocol handler
         gHandler = std::make_shared<Protocol::Handler>(radio);
+
+        // lastly, set up RPC server
+        gLocalRpc = std::make_shared<Rpc::Server>(radio, gHandler);
     } catch(const std::exception &e) {
         PLOG_FATAL << "Initialization failed: " << e.what();
         return 1;
@@ -159,7 +167,9 @@ int main(int argc, char **argv) {
     // clean up
     PLOG_DEBUG << "Shutting down…";
 
+    gLocalRpc.reset();
     gHandler.reset();
-
     gMainLoop.reset();
+
+    return 0;
 }

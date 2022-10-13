@@ -186,6 +186,15 @@ class Radio {
         void reloadConfig(const bool upload);
 
         /**
+         * @brief Get the underlying radio transport
+         *
+         * This is the hardware driver for the radio that we're using to communicate on.
+         */
+        inline std::shared_ptr<Transports::TransportBase> &getTransport() {
+            return this->transport;
+        }
+
+        /**
          * @brief Update the radio channel
          *
          * Set the channel the radio will communicate on. This does not actually take effect

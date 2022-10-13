@@ -98,6 +98,7 @@ add_executable(daemon
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
     Sources/Transports/Base.cpp
+    Sources/Rpc/Server.cpp
 )
 
 # Linux-specific transports (TODO: on FreeBSD also?)
