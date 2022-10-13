@@ -2,6 +2,7 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -285,8 +286,25 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
 
     // uptime
-    text.draw(ctx, {105, 78}, {134, 32}, {1, 1, 1}, fmt::format("{}", info.uptime),
-            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+    std::stringstream upStr;
+    upStr << "<span font_features='tnum'>";
+    if(info.uptime >= (3600 * 24)) {
+        size_t days = std::floor(info.uptime / (3600 / 24));
+        upStr << days << "d ";
+    }
+    if(info.uptime >= 3600) {
+        size_t hrs = std::fmod(std::floor(info.uptime / 3600), 24);
+        upStr << hrs << "h ";
+    }
+    if(info.uptime >= 60 && info.uptime < (3600 * 24)) {
+        // minutes only if uptime isn't > 1 day
+        size_t mins = std::fmod(std::floor(info.uptime / 60), 60.);
+        upStr << mins << "m ";
+    }
+    upStr << "</span>";
+
+    text.draw(ctx, {105, 78}, {134, 32}, {1, 1, 1}, upStr.str(),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 
     // memory usage
     const size_t bytesTotal = info.totalram * info.mem_unit,
