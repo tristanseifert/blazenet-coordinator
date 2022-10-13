@@ -146,12 +146,13 @@ class TextRenderer {
         void draw(cairo_t *ctx, const std::pair<double, double> origin,
                 const std::pair<double, double> size, const std::tuple<double, double, double> color,
                 const std::string_view &data, const HorizontalAlign halign = HorizontalAlign::Center,
-                const VerticalAlign valign = VerticalAlign::Middle, const bool justify = false) {
+                const VerticalAlign valign = VerticalAlign::Middle, const bool justify = false,
+                const bool withTags = false) {
             int width, height;
             double pX, pY;
 
             // set string content
-            this->setTextContent(data, false);
+            this->setTextContent(data, withTags);
             this->setTextLayoutAlign(halign, justify);
 
             if(this->fontDirty) {

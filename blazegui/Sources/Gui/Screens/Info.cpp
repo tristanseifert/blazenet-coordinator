@@ -2,7 +2,13 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
+
+#include <linux/kernel.h>
+#include <sys/sysinfo.h>
 
 #include "Gui/DisplayManager.h"
 #include "Gui/TextRenderer.h"
@@ -44,7 +50,7 @@ void Info::didAppear(DisplayManager *mgr) {
     // create it
     auto evbase = Support::EventLoop::Current()->getEvBase();
     this->timer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Info *>(ctx)->flipPage();
+        reinterpret_cast<Info *>(ctx)->timerFired();
     }, this);
     if(!this->timer) {
         throw std::runtime_error("failed to allocate timer");
@@ -109,6 +115,26 @@ void Info::draw(cairo_t *ctx, const bool dirty) {
         case Section::Network:
             this->drawPageNetwork(ctx, text);
             break;
+
+        case Section::BlazeNetStatus:
+            this->drawPageBlazeStatus(ctx, text);
+            break;
+
+        case Section::BlazeNetTraffic:
+            this->drawPageBlazeTraffic(ctx, text);
+            break;
+
+        case Section::SystemStatus:
+            this->drawPageSysStatus(ctx, text);
+            break;
+
+        case Section::Versions:
+            this->drawPageVersions(ctx, text);
+            break;
+
+        default:
+            throw std::runtime_error("invalid page");
+            break;
     }
 
     // clear dirty flag
@@ -136,9 +162,34 @@ void Info::initResources(cairo_t *ctx) {
 }
 
 /**
+ * @brief Timer has fired
+ */
+void Info::timerFired() {
+    // flip page if needed
+    if(this->cyclingEnabled && this->pageCycles++ >= kPageFlipCycles) {
+        this->flipPage();
+        this->pageCycles = 0;
+    }
+    // otherwise, re-render
+    else {
+        // redraw the page
+        if(this->page == Section::BlazeNetTraffic || this->page == Section::SystemStatus) {
+            this->dirtyFlag = true;
+        }
+    }
+}
+
+/**
  * @brief Flip the displayed information page
  */
 void Info::flipPage() {
+    // get next page
+    size_t temp = static_cast<size_t>(this->page) + 1;
+    if(temp > static_cast<size_t>(Section::Last)) {
+        temp = 0;
+    }
+    this->page = static_cast<Section>(temp);
+
     // mark as dirty
     this->dirtyFlag = true;
 }
@@ -151,11 +202,113 @@ void Info::flipPage() {
  * Show the IP addresses of active network interfaces.
  */
 void Info::drawPageNetwork(cairo_t *ctx, TextRenderer &text) {
-    // section header
     DrawTitle(ctx, text, "IP Status");
+    DrawFooter(ctx, text);
 
-    // network interfaces
+    // TODO: implement
+}
 
+/**
+ * @brief Draw the BlazeNet status page
+ *
+ * Show the IP addresses of active network interfaces.
+ */
+void Info::drawPageBlazeStatus(cairo_t *ctx, TextRenderer &text) {
+    DrawTitle(ctx, text, "BlazeNet Status");
+    DrawFooter(ctx, text);
+
+    // TODO: implement
+}
+
+/**
+ * @brief Draw the BlazeNet traffic page
+ *
+ * Show the current rate of traffic (receive and transmit) over the BlazeNet radio.
+ */
+void Info::drawPageBlazeTraffic(cairo_t *ctx, TextRenderer &text) {
+    DrawTitle(ctx, text, "BlazeNet Traffic");
+    DrawFooter(ctx, text);
+
+    // TODO: implement
+}
+
+/**
+ * @brief Draw the system status page
+ *
+ * This page shows the system's uptime, load average, memory usage, and other such fun
+ * information.
+ */
+void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
+    int err;
+    struct sysinfo info{};
+
+    DrawTitle(ctx, text, "System Status");
+    DrawFooter(ctx, text);
+
+    // get sys info
+    err = sysinfo(&info);
+    if(err) {
+        PLOG_WARNING << "sysinfo failed: " << err << "(errno = " << errno << ")";
+
+        // draw a cross
+        cairo_set_source_rgb(ctx, 1, 0, 0);
+        cairo_set_line_width(ctx, 5.);
+
+        cairo_move_to(ctx, 20, 20);
+        cairo_line_to(ctx, 220, 220);
+        cairo_stroke(ctx);
+
+        cairo_move_to(ctx, 220, 20);
+        cairo_move_to(ctx, 20, 220);
+        cairo_stroke(ctx);
+        return;
+    }
+
+    // left section (labels)
+    text.setFont("DINish Condensed Bold", 20);
+    text.draw(ctx, {0, 44}, {100, 32}, {1, 1, 1}, "Load:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 78}, {100, 32}, {1, 1, 1}, "Uptime:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 112}, {100, 32}, {1, 1, 1}, "RAM:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    // values
+    text.setFont("DINish", 20);
+
+    // load averages
+    const auto load1 = static_cast<double>(info.loads[0]) / static_cast<double>(1 << SI_LOAD_SHIFT);
+
+    text.draw(ctx, {105, 44}, {134, 32}, {1, 1, 1}, fmt::format("{:4.2f}", load1),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+
+    // uptime
+    text.draw(ctx, {105, 78}, {134, 32}, {1, 1, 1}, fmt::format("{}", info.uptime),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+
+    // memory usage
+    const size_t bytesTotal = info.totalram * info.mem_unit,
+          bytesFree = info.freeram * info.mem_unit,
+          bytesUsed = bytesTotal - bytesFree;
+    const double memPercent = (static_cast<double>(bytesUsed) / static_cast<double>(bytesTotal));
+
+    text.draw(ctx, {105, 112}, {134, 32}, {1, 1, 1}, fmt::format("{:4.2f} %", memPercent * 100.),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+}
+
+/**
+ * @brief Show the version page
+ *
+ * Show various software component versions, such as the kernel, OS release, and BlazeNet
+ * coordinator.
+ */
+void Info::drawPageVersions(cairo_t *ctx, TextRenderer &text) {
+    DrawTitle(ctx, text, "Version");
+    DrawFooter(ctx, text);
+
+    // TODO: implement
 }
 
 
@@ -167,4 +320,23 @@ void Info::DrawTitle(cairo_t *ctx, TextRenderer &text, const std::string_view &s
     text.setFont("DINish Condensed Bold", 24);
     text.draw(ctx, {0, 0}, {240, 28}, {1, 1, 1}, str,
             TextRenderer::HorizontalAlign::Center, TextRenderer::VerticalAlign::Top);
+}
+
+/**
+ * @brief Draw the footer with the current date and time
+ */
+void Info::DrawFooter(cairo_t *ctx, TextRenderer &text) {
+    // format the time
+    std::stringstream str;
+    std::time_t t = std::time(nullptr);
+    std::time(&t);
+
+    str << "<span font_features='tnum'>";
+    str << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M");
+    str << "</span>";
+
+    // render it
+    text.setFont("DINish", 18);
+    text.draw(ctx, {0, 212}, {240, 28}, {.85, .85, .85}, str.str(),
+            TextRenderer::HorizontalAlign::Center, TextRenderer::VerticalAlign::Top, false, true);
 }
