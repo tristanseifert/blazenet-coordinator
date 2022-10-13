@@ -118,6 +118,7 @@ add_executable(daemon
     Sources/Drivers/Init.cpp
     Sources/Drivers/Display/St7789.cpp
     Sources/Gui/DisplayManager.cpp
+    Sources/Gui/Screens/Info.cpp
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp

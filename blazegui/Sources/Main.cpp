@@ -15,6 +15,7 @@
 #include "Drivers/Init.h"
 #include "Drivers/Display/Base.h"
 #include "Gui/DisplayManager.h"
+#include "Gui/Screens/Info.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -144,6 +145,9 @@ int main(int argc, char **argv) {
 
             // set up the GUI drawing boi and draw initial frame
             gGuiDispMan = std::make_shared<Gui::DisplayManager>(disp);
+
+            auto info = std::make_shared<Gui::Screens::Info>();
+            gGuiDispMan->setScreen(info);
             gGuiDispMan->forceDraw();
 
             // enable display

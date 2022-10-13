@@ -10,6 +10,7 @@
 #include "Support/Logging.h"
 
 #include "DisplayManager.h"
+#include "Screen.h"
 
 using namespace Gui;
 
@@ -46,7 +47,7 @@ DisplayManager::DisplayManager(const std::shared_ptr<Drivers::Display::Base> &di
     this->ctx = cairo;
 
     // clear the background
-    cairo_set_source_rgb(this->ctx, 0.33, 0.33, 1);
+    cairo_set_source_rgb(this->ctx, 0.2, 0.2, 0.2);
     cairo_paint(this->ctx);
 
     // set up a timer to periodically redraw the display
@@ -87,15 +88,24 @@ DisplayManager::~DisplayManager() {
  */
 void DisplayManager::draw(const bool force) {
     // bail if not dirty
-    if(!force && !this->dirty) {
-        return;
+    if(!force) {
+        if(!this->dirty &&
+                (!this->currentScreen || (this->currentScreen && !this->currentScreen->isDirty()))) {
+            return;
+        }
     }
 
     // prepare context
     cairo_save(this->ctx);
 
     // draw
-    // TODO: this
+    if(this->currentScreen) {
+        this->currentScreen->draw(this->ctx, force || this->dirty);
+    } else {
+        // indicates that there is no screen to render
+        cairo_set_source_rgb(this->ctx, 0.33, 0.33, 1);
+        cairo_paint(this->ctx);
+    }
 
     // restore context state
     cairo_restore(this->ctx);
@@ -115,4 +125,28 @@ void DisplayManager::draw(const bool force) {
     }
 
     this->disp->transferBuffer();
+}
+
+/**
+ * @brief Update the displayed screen
+ *
+ * Ensures the display is redrawn at the next opportunity.
+ *
+ * @param newScreen New screen to render
+ */
+void DisplayManager::setScreen(const std::shared_ptr<Screen> &newScreen) {
+    auto old = this->currentScreen;
+    if(old) {
+        old->willDisappear(this);
+    }
+    newScreen->willAppear(this);
+
+    this->currentScreen = newScreen;
+
+    newScreen->didAppear(this);
+    if(old) {
+        old->didDisappear(this);
+    }
+
+    this->setNeedsDisplay();
 }

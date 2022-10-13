@@ -8,6 +8,8 @@ class Base;
 }
 
 namespace Gui {
+class Screen;
+
 /**
  * @brief GUI display manager
  *
@@ -40,12 +42,17 @@ class DisplayManager {
 
         void draw(const bool force = false);
 
+        void setScreen(const std::shared_ptr<Screen> &newScreen);
+
     private:
         /// Set whenever the display needs a redraw
         bool dirty{false};
 
         /// Display to render to
         std::shared_ptr<Drivers::Display::Base> disp;
+
+        /// Current screen to render
+        std::shared_ptr<Screen> currentScreen;
 
         /// Cairo surface to render to
         struct _cairo_surface *surface{nullptr};
