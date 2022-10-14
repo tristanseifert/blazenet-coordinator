@@ -6,6 +6,7 @@
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <fmt/format.h>
 
 #include <cerrno>
 #include <stdexcept>
@@ -236,7 +237,8 @@ void Server::acceptClient() {
 
 beach:;
     // otherwise, create a client structure
-    auto client = std::make_shared<ClientConnection>(fd);
+    auto client = std::make_shared<ClientConnection>(this, fd);
+    PLOG_DEBUG << fmt::format("accepted client: {}", static_cast<void *>(client.get()));
 
     // store it
     this->clients.emplace_back(std::move(client));
@@ -258,5 +260,6 @@ void Server::garbageCollectClients() {
         return false;
     });
 
-    PLOG_DEBUG_IF(count) << "garbage collected " << count << " client(s)";
+    PLOG_DEBUG_IF(count) << fmt::format("garbage collected {} client(s); {} total", count,
+            this->clients.size());
 }

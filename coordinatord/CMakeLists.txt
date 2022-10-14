@@ -100,6 +100,7 @@ add_executable(daemon
     Sources/Transports/Base.cpp
     Sources/Rpc/Server.cpp
     Sources/Rpc/ClientConnection.cpp
+    Sources/Rpc/Endpoints/Config.cpp
 )
 
 # Linux-specific transports (TODO: on FreeBSD also?)

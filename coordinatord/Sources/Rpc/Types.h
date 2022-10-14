@@ -52,6 +52,18 @@ struct RequestHeader {
      */
     uint8_t payload[];
 } __attribute__((packed));
+
+/**
+ * @brief Request RPC endpoints
+ */
+enum RequestEndpoint: uint8_t {
+    /**
+     * @brief Configuration endpoint
+     *
+     * Allows reading out the running configuration of a variety of components.
+     */
+    Config                              = 0x01,
+};
 }
 
 #endif

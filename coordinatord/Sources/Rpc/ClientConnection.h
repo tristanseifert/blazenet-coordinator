@@ -6,6 +6,8 @@
 #include <vector>
 
 namespace Rpc {
+class Server;
+
 /**
  * @brief Local RPC client instance
  *
@@ -26,7 +28,7 @@ class ClientConnection {
         };
 
     public:
-        ClientConnection(const int socketFd);
+        ClientConnection(Server *parent, const int socketFd);
         ~ClientConnection();
 
         /**
@@ -39,6 +41,13 @@ class ClientConnection {
             return this->deadFlag;
         }
 
+        /**
+         * @brief Get the RPC server this client belongs to
+         */
+        constexpr inline auto getServer() {
+            return this->server;
+        }
+
     private:
         void abort();
 
@@ -46,6 +55,9 @@ class ClientConnection {
         void handleEvent(const size_t eventFlags);
 
     private:
+        /// RPC server that we belong to
+        Server *server{nullptr};
+
         /// Whether the connection is dead, and can be garbage collected
         bool deadFlag{false};
 

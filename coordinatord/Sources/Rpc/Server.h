@@ -27,6 +27,19 @@ class Server {
 
         void reloadConfig();
 
+        /**
+         * @brief Get the radio instance
+         */
+        inline auto getRadio() {
+            return this->radio.lock();
+        }
+        /**
+         * @brief Get the BlazeNet protocol handler
+         */
+        inline auto getProtocol() {
+            return this->protocol.lock();
+        }
+
     private:
         void initSocket(const std::string_view &listenPath);
         void listen();

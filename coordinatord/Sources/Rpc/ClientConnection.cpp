@@ -14,6 +14,7 @@
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 
+#include "Endpoints/Config.h"
 #include "Server.h"
 #include "Types.h"
 #include "ClientConnection.h"
@@ -27,7 +28,8 @@ using namespace Rpc;
  * connection, and being notified when events take place on the connection. These events will
  * call back into the client connection instance.
  */
-ClientConnection::ClientConnection(const int socketFd) : socket(socketFd) {
+ClientConnection::ClientConnection(Server *parent, const int socketFd) : server(parent),
+    socket(socketFd) {
     auto evbase = Support::EventLoop::Current()->getEvBase();
 
     // create buffer event
@@ -154,7 +156,10 @@ void ClientConnection::handleRead() {
     // invoke handler
     try {
         switch(hdr->endpoint) {
-            // TODO: implement this, lol
+            case RequestEndpoint::Config:
+                Endpoints::Config::Handle(this, cborItem);
+                break;
+
             // unimplemented endpoint
             default:
                 throw std::runtime_error(fmt::format("unknown rpc endpoint ${:02x}",
