@@ -14,6 +14,7 @@
 #include <system_error>
 
 #include "Config/Reader.h"
+#include "Support/Cbor.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 
@@ -177,14 +178,47 @@ uint8_t BlazedClient::sendPacket(const uint8_t endpoint, std::span<const std::by
 }
 
 /**
+ * @brief Serialize a CBOR message and send it
+ *
+ * @param endpoint Endpoint to submit the packet to
+ * @param root CBOR item to serialize as the root of the message
+ *
+ * @return Tag of the transmitted packet
+ */
+uint8_t BlazedClient::sendPacket(const uint8_t endpoint, cbor_item_t* &root) {
+    uint8_t tag;
+
+    // serialize message
+    size_t rootBufLen;
+    unsigned char *rootBuf{nullptr};
+    const size_t serializedBytes = cbor_serialize_alloc(root, &rootBuf, &rootBufLen);
+    cbor_decref(&root);
+
+    // then try to send the packet
+    try {
+        tag = this->sendPacket(RequestEndpoint::Config,
+                {reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
+        free(rootBuf);
+    } catch(const std::exception &e) {
+        free(rootBuf);
+        this->tearDown();
+        throw;
+    }
+
+    return tag;
+}
+
+/**
  * @brief Wait to receive a response
  *
  * Read the next full packet from the socket. Its tag must match the specified tag. On completion,
  * the full response is in the class receive buffer.
  *
  * @param expectedTag Tag we expect for the next message
+ *
+ * @return Payload of the message decoded as CBOR, if any
  */
-void BlazedClient::readResponse(const uint8_t expectedTag) {
+cbor_item_t *BlazedClient::readResponse(const uint8_t expectedTag) {
     // wait to receive a message
     this->rxBuffer.resize(kMaxPacketSize);
     const auto read = recv(this->socket, this->rxBuffer.data(), this->rxBuffer.size(), 0);
@@ -211,10 +245,72 @@ void BlazedClient::readResponse(const uint8_t expectedTag) {
                     hdr->tag, expectedTag));
     }
 
-    // cool, the packet is valid :)
+    std::span<const std::byte> payload(reinterpret_cast<const std::byte *>(hdr->payload),
+            hdr->length - sizeof(*hdr));
+
+    // if there is a payload, decode it as CBOR
+    cbor_item_t *cborItem{nullptr};
+
+    if(!payload.empty()) {
+        struct cbor_load_result result{};
+        cborItem = cbor_load(reinterpret_cast<const cbor_data>(payload.data()), payload.size(),
+                &result);
+
+        if(result.error.code != CBOR_ERR_NONE) {
+            throw std::runtime_error(fmt::format("cbor_load failed: {} (at ${:x})",
+                        result.error.code, result.error.position));
+        }
+    }
+
+    return cborItem;
 }
 
 
+
+/**
+ * @brief Get remote software version
+ *
+ * Read out the version of the blazed daemon, as well as the radio firmware, if any.
+ *
+ * @param outVersion blazed version
+ * @param outBuild blazed build (commit hash)
+ * @param outRadioVersion Radio firmware version
+ */
+void BlazedClient::getVersion(std::string &outVersion, std::string &outBuild,
+        std::string &outRadioVersion) {
+    this->ensureConnection();
+
+    // submit request and receive the response
+    auto root = cbor_new_definite_map(1);
+    cbor_map_add(root, (struct cbor_pair) {
+        .key = cbor_move(cbor_build_string("get")),
+        .value = cbor_move(cbor_build_string("version"))
+    });
+
+    auto response = this->sendWithResponse(RequestEndpoint::Config, root);
+
+    // decode response
+    if(auto version = Support::CborMapGet(response, "version")) {
+        if(cbor_isa_string(version)) {
+            outVersion = std::string(reinterpret_cast<const char *>(cbor_string_handle(version)));
+        }
+    }
+
+    if(auto build = Support::CborMapGet(response, "build")) {
+        if(cbor_isa_string(build)) {
+            outBuild = std::string(reinterpret_cast<const char *>(cbor_string_handle(build)));
+        }
+    }
+
+    if(auto version = Support::CborMapGet(response, "radioVersion")) {
+        if(cbor_isa_string(version)) {
+            outRadioVersion = std::string(
+                    reinterpret_cast<const char *>(cbor_string_handle(version)));
+        }
+    }
+
+    cbor_decref(&response);
+}
 
 /**
  * @brief Get current radio configuration
@@ -224,34 +320,33 @@ void BlazedClient::readResponse(const uint8_t expectedTag) {
  * @param outTxPower Transmit power (in dBm)
  */
 void BlazedClient::getRadioConfig(std::string &outRegion, size_t &outChannel, double &outTxPower) {
-    uint8_t tag;
     this->ensureConnection();
 
-    // build request
+    // submit request and receive the response
     auto root = cbor_new_definite_map(1);
     cbor_map_add(root, (struct cbor_pair) {
         .key = cbor_move(cbor_build_string("get")),
         .value = cbor_move(cbor_build_string("radio"))
     });
 
-    // submit request
-    size_t rootBufLen;
-    unsigned char *rootBuf{nullptr};
-    const size_t serializedBytes = cbor_serialize_alloc(root, &rootBuf, &rootBufLen);
-    cbor_decref(&root);
+    auto response = this->sendWithResponse(RequestEndpoint::Config, root);
 
-    try {
-        tag = this->sendPacket(RequestEndpoint::Config,
-                {reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
-        free(rootBuf);
-    } catch(const std::exception &e) {
-        free(rootBuf);
-        this->tearDown();
-        throw;
+    // decode response
+    if(auto channel = Support::CborMapGet(response, "channel")) {
+        if(cbor_isa_uint(channel)) {
+            outChannel = Support::CborReadUint(channel);
+        }
     }
 
-    // read the response
-    this->readResponse(tag);
+    if(auto txPower = Support::CborMapGet(response, "txPower")) {
+        if(cbor_isa_float_ctrl(txPower)) {
+            outTxPower = Support::CborReadFloat(txPower);
+        }
+    }
+
+    // TODO: region string
+
+    cbor_decref(&response);
 }
 
 /**
@@ -263,4 +358,5 @@ void BlazedClient::getRadioConfig(std::string &outRegion, size_t &outChannel, do
  */
 void BlazedClient::getClientStats(size_t &outNumConnected) {
     this->ensureConnection();
+    // TODO: implement
 }

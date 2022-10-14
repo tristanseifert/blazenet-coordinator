@@ -74,7 +74,11 @@ class BlazedClient {
         BlazedClient();
         ~BlazedClient();
 
+        void getVersion(std::string &outVersion, std::string &outBuild,
+                std::string &outRadioVersion);
+
         void getRadioConfig(std::string &outRegion, size_t &outChannel, double &outTxPower);
+
         void getClientStats(size_t &outNumConnected);
 
     private:
@@ -83,8 +87,24 @@ class BlazedClient {
         void tearDown();
         void sendRaw(std::span<const std::byte>);
 
+        uint8_t sendPacket(const uint8_t, struct cbor_item_t* &);
         uint8_t sendPacket(const uint8_t, std::span<const std::byte>);
-        void readResponse(const uint8_t tag);
+        [[nodiscard]] struct cbor_item_t *readResponse(const uint8_t tag);
+
+        /**
+         * @brief Send a packet and read response
+         *
+         * @param endpoint Endpoint to send the packet to
+         * @param root CBOR item to serialize as the root
+         *
+         * @return Deserialized CBOR payload, if any
+         *
+         * @remark Caller is responsible for deallocating the returned CBOR item
+         */
+        inline auto sendWithResponse(const uint8_t endpoint, struct cbor_item_t* &root) {
+            const auto tag = this->sendPacket(RequestEndpoint::Config, root);
+            return this->readResponse(tag);
+        }
 
     private:
         /// Path for the RPC socket file

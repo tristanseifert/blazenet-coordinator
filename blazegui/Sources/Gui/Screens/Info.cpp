@@ -253,7 +253,7 @@ void Info::drawPageBlazeStatus(cairo_t *ctx, TextRenderer &text) {
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 
     text.draw(ctx, {115, 112}, {124, 32}, {1, 1, 1},
-            fmt::format("<span font_features='tnum'>{:4.1} dBm</span>", txPower),
+            fmt::format("<span font_features='tnum'>{:.3} dBm</span>", txPower),
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 
     text.draw(ctx, {115, 146}, {124, 32}, {1, 1, 1},
