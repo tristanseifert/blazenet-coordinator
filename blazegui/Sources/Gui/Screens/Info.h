@@ -65,7 +65,8 @@ class Info: public Screen {
         void drawPageSysStatus(struct _cairo *, TextRenderer &);
         void drawPageVersions(struct _cairo *, TextRenderer &);
 
-        static void DrawTitle(struct _cairo *, TextRenderer &, const std::string_view &);
+        static void DrawError(struct _cairo *, TextRenderer &, const std::string_view &message);
+        static void DrawTitle(struct _cairo *, TextRenderer &, const std::string_view &title);
         static void DrawFooter(struct _cairo *, TextRenderer &);
 
     private:

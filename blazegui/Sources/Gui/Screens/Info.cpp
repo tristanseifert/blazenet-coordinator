@@ -13,6 +13,7 @@
 
 #include "Gui/DisplayManager.h"
 #include "Gui/TextRenderer.h"
+#include "Rpc/BlazedClient.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 
@@ -99,17 +100,7 @@ void Info::draw(cairo_t *ctx, const bool dirty) {
 
     // fill bg
     cairo_set_source(ctx, this->bgPattern);
-    //cairo_rectangle(ctx, 0, 0, 240, 240);
-    //cairo_fill(ctx);
     cairo_paint(ctx);
-
-/*
-    cairo_set_source_rgb(ctx, 0, 1, 1);
-    cairo_move_to(ctx, 0, 0);
-    cairo_line_to(ctx, 120, 120);
-    cairo_set_line_width(ctx, 5);
-    cairo_stroke(ctx);
-*/
 
     // draw on top
     switch(this->page) {
@@ -173,8 +164,9 @@ void Info::timerFired() {
     }
     // otherwise, re-render
     else {
-        // redraw the page
-        if(this->page == Section::BlazeNetTraffic || this->page == Section::SystemStatus) {
+        // redraw the page (or if cycling is temporarily disabled, re-render it always)
+        if(this->page == Section::BlazeNetTraffic || this->page == Section::SystemStatus ||
+            !this->cyclingEnabled) {
             this->dirtyFlag = true;
         }
     }
@@ -218,7 +210,55 @@ void Info::drawPageBlazeStatus(cairo_t *ctx, TextRenderer &text) {
     DrawTitle(ctx, text, "BlazeNet Status");
     DrawFooter(ctx, text);
 
-    // TODO: implement
+    // fetch the info
+    std::string region{"???"};
+    size_t channel{0}, numClients{0};
+    double txPower{NAN};
+
+    try {
+        auto &rpc = Rpc::BlazedClient::The();
+        rpc->getRadioConfig(region, channel, txPower);
+        rpc->getClientStats(numClients);
+    }
+    // draw pretty errors
+    catch(const std::exception &e) {
+        DrawError(ctx, text, e.what());
+
+        PLOG_ERROR << "failed to get BlazeNet status: " << e.what();
+        return;
+    }
+
+    // left section (labels)
+    text.setFont("DINish Condensed Bold", 18);
+    text.draw(ctx, {0, 44}, {110, 32}, {1, 1, 1}, "Region:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 78}, {110, 32}, {1, 1, 1}, "Channel:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 112}, {110, 32}, {1, 1, 1}, "TX Power:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 146}, {110, 32}, {1, 1, 1}, "Clients:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    // right section (values)
+    text.setFont("DINish", 18);
+
+    text.draw(ctx, {115, 44}, {124, 32}, {1, 1, 1}, region,
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {115, 78}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}</span>", channel),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
+
+    text.draw(ctx, {115, 112}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{:4.1} dBm</span>", txPower),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
+
+    text.draw(ctx, {115, 146}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}</span>", numClients),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 }
 
 /**
@@ -266,23 +306,23 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
     }
 
     // left section (labels)
-    text.setFont("DINish Condensed Bold", 20);
-    text.draw(ctx, {0, 44}, {100, 32}, {1, 1, 1}, "Load:",
+    text.setFont("DINish Condensed Bold", 18);
+    text.draw(ctx, {0, 44}, {110, 32}, {1, 1, 1}, "Load:",
             TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
 
-    text.draw(ctx, {0, 78}, {100, 32}, {1, 1, 1}, "Uptime:",
+    text.draw(ctx, {0, 78}, {110, 32}, {1, 1, 1}, "Uptime:",
             TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
 
-    text.draw(ctx, {0, 112}, {100, 32}, {1, 1, 1}, "RAM:",
+    text.draw(ctx, {0, 112}, {110, 32}, {1, 1, 1}, "RAM:",
             TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
 
     // values
-    text.setFont("DINish", 20);
+    text.setFont("DINish", 18);
 
     // load averages
     const auto load1 = static_cast<double>(info.loads[0]) / static_cast<double>(1 << SI_LOAD_SHIFT);
 
-    text.draw(ctx, {105, 44}, {134, 32}, {1, 1, 1}, fmt::format("{:4.2f}", load1),
+    text.draw(ctx, {115, 44}, {124, 32}, {1, 1, 1}, fmt::format("{:4.2f}", load1),
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
 
     // uptime
@@ -303,7 +343,7 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
     }
     upStr << "</span>";
 
-    text.draw(ctx, {105, 78}, {134, 32}, {1, 1, 1}, upStr.str(),
+    text.draw(ctx, {115, 78}, {124, 32}, {1, 1, 1}, upStr.str(),
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 
     // memory usage
@@ -312,7 +352,7 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
           bytesUsed = bytesTotal - bytesFree;
     const double memPercent = (static_cast<double>(bytesUsed) / static_cast<double>(bytesTotal));
 
-    text.draw(ctx, {105, 112}, {134, 32}, {1, 1, 1}, fmt::format("{:4.2f} %", memPercent * 100.),
+    text.draw(ctx, {115, 112}, {124, 32}, {1, 1, 1}, fmt::format("{:4.2f} %", memPercent * 100.),
             TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
 }
 
@@ -332,11 +372,26 @@ void Info::drawPageVersions(cairo_t *ctx, TextRenderer &text) {
 
 
 /**
+ * @brief Draw an error message string
+ */
+void Info::DrawError(cairo_t *ctx, TextRenderer &text, const std::string_view &what) {
+    // TODO: draw error icon (y = 44)
+
+    // draw the error message
+    text.setFont("Liberation Sans", 18);
+    text.setTextLayoutWrapMode(true, true);
+    text.setTextLayoutEllipsization(TextRenderer::EllipsizeMode::End);
+
+    text.draw(ctx, {2, 78}, {236, 160}, {1, 1, 1}, what,
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Top);
+}
+
+/**
  * @brief Draw a screen title
  */
-void Info::DrawTitle(cairo_t *ctx, TextRenderer &text, const std::string_view &str) {
+void Info::DrawTitle(cairo_t *ctx, TextRenderer &text, const std::string_view &title) {
     text.setFont("DINish Condensed Bold", 24);
-    text.draw(ctx, {0, 0}, {240, 28}, {1, 1, 1}, str,
+    text.draw(ctx, {0, 0}, {240, 28}, {1, 1, 1}, title,
             TextRenderer::HorizontalAlign::Center, TextRenderer::VerticalAlign::Top);
 }
 

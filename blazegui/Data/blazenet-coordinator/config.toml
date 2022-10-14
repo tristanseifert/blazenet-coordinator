@@ -5,6 +5,10 @@
 socket = "/var/run/confd/rpc.sock"
 
 ################################################################################
+[blazed]
+socket = "/var/run/blazed/rpc.sock"
+
+################################################################################
 [display]
 driver = "st7789"
 size = [240, 240]
@@ -12,7 +16,7 @@ rotation = 0
 
 [display.transport]
 device = "/dev/spidev1.0"
-max-speed = 10000000
+max-speed = 25000000
 
 cs-gpio = "gpiochip8:7"
 reset-gpio = "gpiochip8:6"

@@ -122,6 +122,7 @@ add_executable(daemon
     Sources/Support/EventLoop.cpp
     Sources/Support/Logging.cpp
     Sources/Support/Watchdog.cpp
+    Sources/Rpc/BlazedClient.cpp
 )
 
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)

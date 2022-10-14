@@ -16,6 +16,7 @@
 #include "Drivers/Display/Base.h"
 #include "Gui/DisplayManager.h"
 #include "Gui/Screens/Info.h"
+#include "Rpc/BlazedClient.h"
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 #include "Support/Watchdog.h"
@@ -168,6 +169,7 @@ int main(int argc, char **argv) {
 
     Drivers::CleanUp();
 
+    Rpc::BlazedClient::CleanUp();
     gMainLoop.reset();
 
     return 0;
