@@ -2,15 +2,23 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <ctime>
+#include <map>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
+#include <arpa/inet.h>
 #include <linux/kernel.h>
+#include <net/if.h>
 #include <sys/sysinfo.h>
+#include <sys/types.h>
 #include <sys/utsname.h>
+#include <ifaddrs.h>
 
 #include "Gui/DisplayManager.h"
 #include "Gui/TextRenderer.h"
@@ -207,10 +215,160 @@ void Info::flipPage() {
  * Show the IP addresses of active network interfaces.
  */
 void Info::drawPageNetwork(cairo_t *ctx, TextRenderer &text) {
+    int err;
+    struct ifaddrs *addrs,*tmp;
+
     DrawTitle(ctx, text, "IP Status");
     DrawFooter(ctx, text);
 
-    // TODO: implement
+    // query for connected interfaces
+    err = getifaddrs(&addrs);
+    if(err) {
+        DrawError(ctx, text, fmt::format("getifaddrs failed: {} ({})", strerror(errno), errno));
+
+        PLOG_ERROR << "getifaddrs failed: " << errno;
+        return;
+    }
+
+    /*
+     * Now, iterate over all network interfaces (excepting loopbacks) and figure out all
+     * relevant information about them. This involves deduplicating the interfaces, since
+     * getifaddrs() returns the same interface multiple times.
+     *
+     * Then, for each of the duplicate records, figure out the relevant socket address structures
+     * and store them for each interface.
+     */
+    tmp = addrs;
+
+    std::map<std::string, InterfaceInfo> interfaces;
+
+    while(tmp) {
+        // get this interface, then advance ptr to next
+        auto intf = tmp;
+        tmp = tmp->ifa_next;
+        // ignore loopback interfaces
+        if(intf->ifa_flags & IFF_LOOPBACK) {
+            continue;
+        }
+        // append the address to an existing item
+        std::string name(intf->ifa_name);
+        if(interfaces.contains(name)) {
+            auto &info = interfaces.at(name);
+
+            if(intf->ifa_addr) {
+                info.addresses.emplace(intf->ifa_addr->sa_family, intf->ifa_addr);
+            }
+        }
+        // create a new item
+        else {
+            InterfaceInfo info;
+            info.flags = intf->ifa_flags;
+
+            if(intf->ifa_addr) {
+                info.addresses.emplace(intf->ifa_addr->sa_family, intf->ifa_addr);
+            }
+
+            interfaces.emplace(name, std::move(info));
+        }
+    }
+
+    /*
+     * Draw the interface information based on the previously collected data.
+     *
+     * Since this references the original interface structs, we wait to deallocate them until after
+     * we're done drawing. This is clipped so that we don't draw on top of the footer at the
+     * bottom of the display.
+     */
+    size_t y = 45;
+
+    cairo_rectangle(ctx, 0, 0, 240, 208);
+    cairo_clip(ctx);
+
+    for(const auto &[name, info] : interfaces) {
+        y += this->drawNetworkInterface(ctx, text, y, info, name);
+        y += 10;
+    }
+
+    freeifaddrs(addrs);
+}
+
+/**
+ * @brief Fetch interface info and render
+ *
+ * Acquire additional information about the specified interface (such as its addresses and traffic
+ * counters) and draw them.
+ *
+ * @param ctx Drawing context
+ * @param text Text rendering helper
+ * @param y Starting Y coordinate for interface
+ * @param info Interface information
+ * @param ifName Interface name
+ *
+ * @return Vertical height consumed
+ */
+size_t Info::drawNetworkInterface(cairo_t *ctx, TextRenderer &text, const double y,
+        const InterfaceInfo &info, const std::string &ifName) {
+    size_t height{24};
+
+    // draw interface name with up/down indicator
+    text.setFont("DINish Bold", 18);
+    text.draw(ctx, {34, y}, {202, 22}, {1, 1, 1}, ifName,
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Bottom);
+
+    cairo_new_path(ctx);
+    cairo_set_line_width(ctx, 4);
+
+    if(info.flags & IFF_UP) {
+        cairo_arc(ctx, 15, y + 8, 10, 0, M_PI * 1.95);
+        cairo_set_source_rgb(ctx, .6, .9, .6);
+        cairo_stroke_preserve(ctx);
+        cairo_set_source_rgb(ctx, .2, .9, .2);
+        cairo_fill(ctx);
+    } else {
+        cairo_rectangle(ctx, 8, y, 18, 18);
+        cairo_set_source_rgb(ctx, .9, .4, .4);
+        cairo_stroke_preserve(ctx);
+        cairo_set_source_rgb(ctx, 1, .25, .25);
+        cairo_fill(ctx);
+    }
+
+    // interface addresses
+    text.setFont("DINish Condensed", 15);
+
+    // IPv4
+    if(info.addresses.contains(AF_INET)) {
+        std::array<char, INET_ADDRSTRLEN> buf;
+
+        auto inet = reinterpret_cast<const struct sockaddr_in *>(info.addresses.at(AF_INET));
+        inet_ntop(inet->sin_family, &inet->sin_addr, buf.data(), buf.size());
+
+        std::string addrString(buf.data());
+        text.draw(ctx, {34, y + height}, {202, 20}, {1, 1, 1},
+                fmt::format("<span font_features='tnum'>{}</span>", addrString),
+                TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Bottom, false, true);
+
+        height += 20;
+    }
+
+    // IPv6
+    if(info.addresses.contains(AF_INET6)) {
+        std::array<char, INET6_ADDRSTRLEN> buf;
+
+        auto inet = reinterpret_cast<const struct sockaddr_in6 *>(info.addresses.at(AF_INET6));
+        inet_ntop(inet->sin6_family, &inet->sin6_addr, buf.data(), buf.size());
+
+        std::string addrString(buf.data());
+
+        text.setTextLayoutEllipsization(TextRenderer::EllipsizeMode::None);
+        text.setTextLayoutWrapMode(false, true);
+        text.draw(ctx, {34, y + height}, {202, 52}, {1, 1, 1},
+                fmt::format("<span font_features='tnum'>{}</span>", addrString),
+                TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Top, false, true);
+
+        height += 52;
+    }
+
+    return height;
 }
 
 /**
@@ -219,7 +377,7 @@ void Info::drawPageNetwork(cairo_t *ctx, TextRenderer &text) {
  * Show the IP addresses of active network interfaces.
  */
 void Info::drawPageBlazeStatus(cairo_t *ctx, TextRenderer &text) {
-    DrawTitle(ctx, text, "BlazeNet Status");
+    DrawTitle(ctx, text, "Radio");
     DrawFooter(ctx, text);
 
     // fetch the info
@@ -279,7 +437,7 @@ void Info::drawPageBlazeStatus(cairo_t *ctx, TextRenderer &text) {
  * Show the current rate of traffic (receive and transmit) over the BlazeNet radio.
  */
 void Info::drawPageBlazeTraffic(cairo_t *ctx, TextRenderer &text) {
-    DrawTitle(ctx, text, "BlazeNet Traffic");
+    DrawTitle(ctx, text, "BlazeNet");
     DrawFooter(ctx, text);
 
     // TODO: implement
@@ -295,7 +453,7 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
     int err;
     struct sysinfo info{};
 
-    DrawTitle(ctx, text, "System Status");
+    DrawTitle(ctx, text, "System");
     DrawFooter(ctx, text);
 
     // get sys info

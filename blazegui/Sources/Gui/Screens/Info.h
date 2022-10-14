@@ -42,6 +42,14 @@ class Info: public Screen {
             Last                        = Versions,
         };
 
+        /// Information for a single network interface
+        struct InterfaceInfo {
+            /// Flags (from ifa_flags)
+            size_t flags{0};
+            /// Interface addresses
+            std::unordered_map<size_t, struct sockaddr *> addresses;
+        };
+
     public:
         ~Info();
 
@@ -62,6 +70,9 @@ class Info: public Screen {
         void flipPage();
 
         void drawPageNetwork(struct _cairo *, TextRenderer &);
+        size_t drawNetworkInterface(struct _cairo *, TextRenderer &, const double,
+                const InterfaceInfo &, const std::string &);
+
         void drawPageBlazeStatus(struct _cairo *, TextRenderer &);
         void drawPageBlazeTraffic(struct _cairo *, TextRenderer &);
         void drawPageSysStatus(struct _cairo *, TextRenderer &);
