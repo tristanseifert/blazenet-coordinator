@@ -52,6 +52,7 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
 
     memcpy(this->eui64.data(), info.hw.eui64, sizeof(info.hw.eui64));
     this->serial = std::string(info.hw.serial, strnlen(info.hw.serial, sizeof(info.hw.serial)));
+    this->fwVersion = std::string(info.fw.build, strnlen(info.fw.build, sizeof(info.fw.build)));
 
     PLOG_INFO << "Radio s/n: " << this->serial << ", EUI64: " <<
         fmt::format("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", this->eui64[0],

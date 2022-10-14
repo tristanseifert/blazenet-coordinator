@@ -204,6 +204,15 @@ class Radio {
         }
 
         /**
+         * @brief Get radio firmware version
+         *
+         * Read from the radio during initialization.
+         */
+        constexpr inline auto &getFwVersion() const {
+            return this->fwVersion;
+        }
+
+        /**
          * @brief Update the radio channel
          *
          * Set the channel the radio will communicate on. This does not actually take effect
@@ -364,6 +373,8 @@ class Radio {
         std::array<std::byte, 8> eui64;
         /// Serial number of the radio
         std::string serial;
+        /// Firmware version of the radio
+        std::string fwVersion;
 
         /// Is the radio configuration dirty?
         bool isConfigDirty{true};

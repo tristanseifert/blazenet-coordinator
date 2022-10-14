@@ -89,7 +89,14 @@ void Config::GetRadioCfg(ClientConnection *client, const cbor_item_t *) {
  * @brief Get the software version
  */
 void Config::GetVersion(ClientConnection *client, const cbor_item_t *) {
-    auto root = cbor_new_definite_map(2);
+    // get the radio
+    auto radio = client->getServer()->getRadio();
+    if(!radio) {
+        throw std::runtime_error("failed to get radio instance");
+    }
+
+    // build response
+    auto root = cbor_new_definite_map(3);
 
     cbor_map_add(root, (struct cbor_pair) {
         .key = cbor_move(cbor_build_string("version")),
@@ -98,6 +105,11 @@ void Config::GetVersion(ClientConnection *client, const cbor_item_t *) {
     cbor_map_add(root, (struct cbor_pair) {
         .key = cbor_move(cbor_build_string("build")),
         .value = cbor_move(cbor_build_string(kVersionGitHash)),
+    });
+
+    cbor_map_add(root, (struct cbor_pair) {
+        .key = cbor_move(cbor_build_string("radioVersion")),
+        .value = cbor_move(cbor_build_string(radio->getFwVersion().c_str())),
     });
 
     Reply(client, root);
