@@ -194,3 +194,49 @@ void ClientConnection::handleEvent(const size_t flags) {
     }
     // TODO: do we need to handle BEV_EVENT_READING or BEV_EVENT_WRITING?
 }
+
+
+
+/**
+ * @brief Slap an RPC header in front of the payload and send it
+ *
+ * @param payload Data to transmit
+ */
+void ClientConnection::reply(std::span<const std::byte> payload) {
+    std::vector<std::byte> buffer;
+    buffer.resize(sizeof(struct RequestHeader) + payload.size(), std::byte{0});
+
+    // get last header
+    if(this->rxBuffer.size() < sizeof(RequestHeader)) {
+        throw std::runtime_error("invalid rx packet buffer (for tag/ep)");
+    }
+    auto lastHdr = reinterpret_cast<const RequestHeader *>(this->rxBuffer.data());
+
+    // build up the header
+    auto hdr = reinterpret_cast<struct RequestHeader *>(buffer.data());
+    hdr->version = kCurrentVersion;
+    hdr->length = sizeof(*hdr) + payload.size();
+    hdr->endpoint = lastHdr->endpoint;
+    hdr->tag = lastHdr->tag;
+
+    // copy payload
+    if(!payload.empty()) {
+        std::copy(payload.begin(), payload.end(), buffer.begin() + sizeof(*hdr));
+    }
+
+    // send and return tag
+    this->sendRaw(buffer);
+}
+
+/**
+ * @brief Send a raw packet to the remote
+ *
+ * This assumes the packet already has a `struct RpcHeader` prepended.
+ */
+void ClientConnection::sendRaw(std::span<const std::byte> payload) {
+    // TODO: should we write to the buffer event instead?
+    int err = write(this->socket, payload.data(), payload.size());
+    if(err == -1) {
+        throw std::system_error(errno, std::generic_category(), "write");
+    }
+}

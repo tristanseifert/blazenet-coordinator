@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace Rpc {
@@ -48,11 +49,15 @@ class ClientConnection {
             return this->server;
         }
 
+        void reply(std::span<const std::byte> payload);
+
     private:
         void abort();
 
         void handleRead();
         void handleEvent(const size_t eventFlags);
+
+        void sendRaw(std::span<const std::byte> payload);
 
     private:
         /// RPC server that we belong to

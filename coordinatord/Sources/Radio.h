@@ -195,6 +195,15 @@ class Radio {
         }
 
         /**
+         * @brief Get the radio serial number
+         *
+         * Read from the radio during initialization.
+         */
+        constexpr inline auto &getSerial() const {
+            return this->serial;
+        }
+
+        /**
          * @brief Update the radio channel
          *
          * Set the channel the radio will communicate on. This does not actually take effect
@@ -205,6 +214,14 @@ class Radio {
         inline void setChannel(const uint16_t newChannel) {
             this->currentChannel = newChannel;
             this->isConfigDirty = true;
+        }
+        /**
+         * @brief Get the radio channel
+         *
+         * @return Current radio channel
+         */
+        constexpr inline uint16_t getChannel() const {
+            return this->currentChannel;
         }
 
         /**
@@ -217,6 +234,14 @@ class Radio {
         inline void setTxPower(const uint16_t newPower) {
             this->currentTxPower = newPower;
             this->isConfigDirty = true;
+        }
+        /**
+         * @brief Get current transmit power
+         *
+         * @return Transmit power, in ⅒th of a dBm
+         */
+        constexpr inline double getTxPower() const {
+            return static_cast<double>(this->currentTxPower) / 10.;
         }
 
         /**
