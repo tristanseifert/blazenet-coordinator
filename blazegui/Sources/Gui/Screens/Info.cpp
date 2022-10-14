@@ -10,6 +10,7 @@
 
 #include <linux/kernel.h>
 #include <sys/sysinfo.h>
+#include <sys/utsname.h>
 
 #include "Gui/DisplayManager.h"
 #include "Gui/TextRenderer.h"
@@ -22,13 +23,24 @@
 using namespace Gui::Screens;
 
 /**
+ * @brief Per screen background colors
+ *
+ * Defines the key color for the background gradients
+ */
+const std::unordered_map<Info::Section, std::tuple<double, double, double>> Info::gBgColors{{
+    { Section::Network,         {0., 0., .74}},
+    { Section::BlazeNetStatus,  {.29, 0., .51}},
+    { Section::BlazeNetTraffic, {.74, 0., 0.}},
+    { Section::SystemStatus,    {.74, 0, .74}},
+    { Section::Versions,        {.29, 0, .51}},
+}};
+
+
+
+/**
  * @brief Release drawing resources
  */
 Info::~Info() {
-    if(this->bgPattern) {
-        cairo_pattern_destroy(this->bgPattern);
-    }
-
     if(this->timer) {
         event_del(this->timer);
         event_free(this->timer);
@@ -92,15 +104,16 @@ void Info::willDisappear(DisplayManager *mgr) {
 void Info::draw(cairo_t *ctx, const bool dirty) {
     // create resources, if needed
     if(!this->hasResources) {
-        this->initResources(ctx);
         this->hasResources = true;
     }
 
     TextRenderer text(ctx);
 
-    // fill bg
-    cairo_set_source(ctx, this->bgPattern);
+    // create bg pattern and fill
+    auto bgPattern = this->makeGradient(gBgColors.at(this->page));
+    cairo_set_source(ctx, bgPattern);
     cairo_paint(ctx);
+    cairo_pattern_destroy(bgPattern);
 
     // draw on top
     switch(this->page) {
@@ -134,12 +147,9 @@ void Info::draw(cairo_t *ctx, const bool dirty) {
 }
 
 /**
- * @brief Initialize Cairo resources
- *
- * This sets up the background gradient and font rendering stuff.
+ * @brief Make background gradient
  */
-void Info::initResources(cairo_t *ctx) {
-    // bg pattern
+cairo_pattern_t *Info::makeGradient(const std::tuple<double, double, double> &rgb) {
     auto pat = cairo_pattern_create_linear(120, 0, 120, 240.);
     if(cairo_pattern_status(pat) != CAIRO_STATUS_SUCCESS) {
         throw std::runtime_error(fmt::format("cairo_pattern_create_linear failed: {}",
@@ -148,9 +158,11 @@ void Info::initResources(cairo_t *ctx) {
 
     cairo_pattern_add_color_stop_rgb(pat, 0.,   0., 0., 0.);
     cairo_pattern_add_color_stop_rgb(pat, 0.6, 0., 0., 0.);
-    cairo_pattern_add_color_stop_rgb(pat, 1.0,  0., 0., .74);
 
-    this->bgPattern = pat;
+    const auto [r, g, b] = rgb;
+    cairo_pattern_add_color_stop_rgb(pat, 1.0,  r, g, b);
+
+    return pat;
 }
 
 /**
@@ -166,7 +178,7 @@ void Info::timerFired() {
     else {
         // redraw the page (or if cycling is temporarily disabled, re-render it always)
         if(this->page == Section::BlazeNetTraffic || this->page == Section::SystemStatus ||
-            !this->cyclingEnabled) {
+            this->page == Section::Network || !this->cyclingEnabled) {
             this->dirtyFlag = true;
         }
     }
@@ -363,10 +375,59 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
  * coordinator.
  */
 void Info::drawPageVersions(cairo_t *ctx, TextRenderer &text) {
+    int err;
+
     DrawTitle(ctx, text, "Version");
     DrawFooter(ctx, text);
 
-    // TODO: implement
+    // get blazed info
+    std::string blazedVersion{""}, blazedBuild{""}, radioVersion{""};
+    bool hasBlazedInfo{false};
+
+    try {
+        auto &rpc = Rpc::BlazedClient::The();
+        rpc->getVersion(blazedVersion, blazedBuild, radioVersion);
+
+        hasBlazedInfo = true;
+    }
+    // draw pretty errors
+    catch(const std::exception &e) {
+        PLOG_WARNING << "failed to get BlazeNet version: " << e.what();
+        hasBlazedInfo = false;
+    }
+    // left section (labels)
+    text.setFont("DINish Condensed Bold", 18);
+    text.draw(ctx, {0, 44}, {110, 32}, {1, 1, 1}, "blazed:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 78}, {110, 32}, {1, 1, 1}, "Radio:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 112}, {110, 32}, {1, 1, 1}, "Kernel:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    // right section (values)
+    text.setFont("DINish", 18);
+
+    if(hasBlazedInfo) {
+        text.draw(ctx, {115, 44}, {124, 32}, {1, 1, 1}, fmt::format("{} ({})", blazedVersion,
+                    blazedBuild), TextRenderer::HorizontalAlign::Left,
+                TextRenderer::VerticalAlign::Middle);
+
+        text.draw(ctx, {115, 78}, {124, 32}, {1, 1, 1}, radioVersion,
+                TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle);
+    }
+
+    // kernel version
+    struct utsname kernelVers{};
+    err = uname(&kernelVers);
+    if(err == -1) {
+        PLOG_WARNING << "uname failed: " << errno;
+    } else {
+        text.draw(ctx, {115, 112}, {124, 32}, {1, 1, 1}, fmt::format("{}", kernelVers.release),
+                TextRenderer::HorizontalAlign::Left,
+                TextRenderer::VerticalAlign::Middle);
+    }
 }
 
 
@@ -410,6 +471,6 @@ void Info::DrawFooter(cairo_t *ctx, TextRenderer &text) {
 
     // render it
     text.setFont("DINish", 18);
-    text.draw(ctx, {0, 212}, {240, 28}, {.85, .85, .85}, str.str(),
+    text.draw(ctx, {0, 210}, {240, 28}, {.85, .85, .85}, str.str(),
             TextRenderer::HorizontalAlign::Center, TextRenderer::VerticalAlign::Top, false, true);
 }

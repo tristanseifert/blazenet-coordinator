@@ -3,6 +3,8 @@
 
 #include <cstddef>
 #include <string_view>
+#include <tuple>
+#include <unordered_map>
 
 #include "Gui/Screen.h"
 
@@ -54,7 +56,7 @@ class Info: public Screen {
         void willDisappear(DisplayManager *) override;
 
     private:
-        void initResources(struct _cairo *);
+        struct _cairo_pattern *makeGradient(const std::tuple<double, double, double> &rgb);
 
         void timerFired();
         void flipPage();
@@ -70,6 +72,9 @@ class Info: public Screen {
         static void DrawFooter(struct _cairo *, TextRenderer &);
 
     private:
+        /// Colors for the background gradients
+        static const std::unordered_map<Section, std::tuple<double, double, double>> gBgColors;
+
         /// Set when the page has been changed
         bool dirtyFlag{true};
         /// Set when all Cairo resources have been created
@@ -83,9 +88,6 @@ class Info: public Screen {
         struct event *timer{nullptr};
         /// Number of redraw cycles we've gone through
         size_t pageCycles{0};
-
-        /// Background gradient pattern
-        struct _cairo_pattern *bgPattern{nullptr};
 };
 }
 
