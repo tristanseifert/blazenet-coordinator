@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <cbor.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -17,6 +16,7 @@
 #include "Support/EventLoop.h"
 #include "Support/Logging.h"
 
+#include "ClientConnection.h"
 #include "Server.h"
 
 using namespace Rpc;
@@ -41,6 +41,9 @@ Server::Server(const std::shared_ptr<Radio> &radio,
     this->initSocket(socketPath.value_or(""));
     this->listen();
     this->initListenEvent();
+
+    // client management stuff
+    this->initClientGc();
 }
 
 /**
@@ -131,11 +134,46 @@ void Server::initListenEvent() {
 }
 
 /**
+ * @brief Initialize the client connection garbage collector
+ *
+ * This is a periodic timer that when it fires will deallocate all clients that are dead. This
+ * will reclaim various resources associated with them.
+ */
+void Server::initClientGc() {
+    auto evbase = Support::EventLoop::Current()->getEvBase();
+    this->clientGcTimer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
+        auto server = reinterpret_cast<Server *>(ctx);
+        server->numOffCycleGc = 0;
+        server->garbageCollectClients();
+    }, this);
+    if(!this->clientGcTimer) {
+        throw std::runtime_error("failed to allocate client gc timer");
+    }
+
+    // set the interval
+    struct timeval tv{
+        .tv_sec  = static_cast<time_t>(kClientGcInterval),
+        .tv_usec = static_cast<suseconds_t>(0),
+    };
+
+    evtimer_add(this->clientGcTimer, &tv);
+}
+
+/**
  * @brief Close down the RPC server
  *
  * Shut down the listening socket and terminate any still connected clients.
  */
 Server::~Server() {
+    // clean up client garbage collector
+    if(this->clientGcTimer) {
+        event_del(this->clientGcTimer);
+        event_free(this->clientGcTimer);
+    }
+
+    // TODO: shut down clients
+    this->clients.clear();
+
     // shut down accept event
     if(this->listenEvent) {
         event_del(this->listenEvent);
@@ -168,5 +206,57 @@ void Server::reloadConfig() {
  * and creates a client handler for it.
  */
 void Server::acceptClient() {
-    // TODO: implement
+    // accept client socket
+    int fd = accept(this->listenSock, nullptr, nullptr);
+    if(fd == -1) {
+        throw std::system_error(errno, std::generic_category(), "accept");
+    }
+
+    // convert socket to non-blocking
+    int err = evutil_make_socket_nonblocking(fd);
+    if(err == -1) {
+        throw std::system_error(errno, std::generic_category(), "evutil_make_socket_nonblocking");
+    }
+
+    // if at capacity, close the socket again
+    if(this->clients.size() > kMaxClients) {
+        // garbage collect right now, if allowed
+        if(++this->numOffCycleGc < kClientGcMaxOffcycle) {
+            this->garbageCollectClients();
+            if(this->clients.size() < kMaxClients) {
+                goto beach;
+            }
+        }
+
+        close(fd);
+
+        ++this->numClientsRejected;
+        throw std::runtime_error("maximum number of clients accepted!");
+    }
+
+beach:;
+    // otherwise, create a client structure
+    auto client = std::make_shared<ClientConnection>(fd);
+
+    // store it
+    this->clients.emplace_back(std::move(client));
+}
+
+/**
+ * @brief Perform client garbage collection
+ *
+ * Deallocate resources associated with all deceased clients.
+ */
+void Server::garbageCollectClients() {
+    size_t count{0};
+
+    std::erase_if(this->clients, [&count](const auto &client) -> bool {
+        if(client->isDead()) {
+            count++;
+            return true;
+        }
+        return false;
+    });
+
+    PLOG_DEBUG_IF(count) << "garbage collected " << count << " client(s)";
 }

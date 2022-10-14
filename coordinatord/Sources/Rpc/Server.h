@@ -1,6 +1,7 @@
 #ifndef RPC_SERVER_H
 #define RPC_SERVER_H
 
+#include <list>
 #include <memory>
 
 class Radio;
@@ -9,6 +10,8 @@ class Handler;
 }
 
 namespace Rpc {
+class ClientConnection;
+
 /**
  * @brief Local RPC server
  *
@@ -29,6 +32,9 @@ class Server {
         void listen();
         void initListenEvent();
 
+        void initClientGc();
+        void garbageCollectClients();
+
         void acceptClient();
 
     private:
@@ -36,6 +42,10 @@ class Server {
         constexpr static const size_t kListenBacklog{5};
         /// Maximum number of simultaneous connected clients
         constexpr static const size_t kMaxClients{100};
+        /// Interval for client garbage collection (sec)
+        constexpr static const size_t kClientGcInterval{15};
+        /// Maximum number of times garbage collection can be invoked between scheduled intervals
+        constexpr static const size_t kClientGcMaxOffcycle{10};
 
         /// Radio abstraction layer
         std::weak_ptr<Radio> radio;
@@ -46,6 +56,16 @@ class Server {
         int listenSock{-1};
         /// Event for the listening socket (triggered on accept)
         struct event *listenEvent{nullptr};
+
+        /// Timer event to garbage collect disconnected clients
+        struct event *clientGcTimer{nullptr};
+        /// List containing all connected clients
+        std::list<std::shared_ptr<ClientConnection>> clients;
+
+        /// Number of times garbage collection has ran since the last timer event
+        size_t numOffCycleGc{0};
+        /// Number of clients rejected because we're at capacity
+        size_t numClientsRejected{0};
 };
 }
 
