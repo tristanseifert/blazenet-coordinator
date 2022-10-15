@@ -499,16 +499,16 @@ void Info::drawPageSysStatus(cairo_t *ctx, TextRenderer &text) {
     std::stringstream upStr;
     upStr << "<span font_features='tnum'>";
     if(info.uptime >= (3600 * 24)) {
-        size_t days = std::floor(info.uptime / (3600 / 24));
+        size_t days = std::floor(info.uptime / (3600. * 24.));
         upStr << days << "d ";
     }
     if(info.uptime >= 3600) {
-        size_t hrs = std::fmod(std::floor(info.uptime / 3600), 24);
+        size_t hrs = std::fmod(std::floor(info.uptime / 3600.), 24);
         upStr << hrs << "h ";
     }
     if(info.uptime >= 60 && info.uptime < (3600 * 24)) {
         // minutes only if uptime isn't > 1 day
-        size_t mins = std::fmod(std::floor(info.uptime / 60), 60.);
+        size_t mins = std::fmod(std::floor(info.uptime / 60.), 60.);
         upStr << mins << "m ";
     }
     upStr << "</span>";
