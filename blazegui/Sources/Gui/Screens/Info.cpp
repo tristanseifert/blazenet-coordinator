@@ -440,7 +440,53 @@ void Info::drawPageBlazeTraffic(cairo_t *ctx, TextRenderer &text) {
     DrawTitle(ctx, text, "BlazeNet");
     DrawFooter(ctx, text);
 
-    // TODO: implement
+    // get status
+    size_t rxGood{0}, rxCorrupt{0}, rxOverrun{0}, txGood{0}, txCcaFail{0}, txUnderrun{0};
+
+    try {
+        auto &rpc = Rpc::BlazedClient::The();
+        rpc->getRadioStats(rxGood, rxCorrupt, rxOverrun, txGood, txCcaFail, txUnderrun);
+    }
+    // draw pretty errors
+    catch(const std::exception &e) {
+        DrawError(ctx, text, e.what());
+
+        PLOG_ERROR << "failed to get BlazeNet radio counters: " << e.what();
+        return;
+    }
+
+    // left section (labels)
+    text.setFont("DINish Condensed Bold", 18);
+    text.draw(ctx, {0, 44}, {110, 32}, {1, 1, 1}, "Receive:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 78}, {110, 32}, {1, 1, 1}, "RX Errors:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 112}, {110, 32}, {1, 1, 1}, "Transmit:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    text.draw(ctx, {0, 146}, {110, 32}, {1, 1, 1}, "TX Errors:",
+            TextRenderer::HorizontalAlign::Right, TextRenderer::VerticalAlign::Middle);
+
+    // right section (values)
+    text.setFont("DINish", 18);
+
+    text.draw(ctx, {115, 44}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}</span>", rxGood),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
+
+    text.draw(ctx, {115, 78}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}/{}</span>", rxCorrupt, rxOverrun),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
+
+    text.draw(ctx, {115, 112}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}</span>", txGood),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
+
+    text.draw(ctx, {115, 146}, {124, 32}, {1, 1, 1},
+            fmt::format("<span font_features='tnum'>{}/{}</span>", txCcaFail, txUnderrun),
+            TextRenderer::HorizontalAlign::Left, TextRenderer::VerticalAlign::Middle, false, true);
 }
 
 /**

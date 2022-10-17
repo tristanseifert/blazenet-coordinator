@@ -64,6 +64,8 @@ class BlazedClient {
         enum RequestEndpoint: uint8_t {
             /// Read running configuration
             Config                      = 0x01,
+            /// Get status of various components
+            Status                      = 0x02,
         };
 
     public:
@@ -79,6 +81,8 @@ class BlazedClient {
 
         void getRadioConfig(std::string &outRegion, size_t &outChannel, double &outTxPower);
 
+        void getRadioStats(size_t &outRxGood, size_t &outRxCorrupt, size_t &outRxFifoOverruns,
+                size_t &outTxGood, size_t &outTxCcaFails, size_t &outTxFifoUnderruns);
         void getClientStats(size_t &outNumConnected);
 
     private:
@@ -102,7 +106,7 @@ class BlazedClient {
          * @remark Caller is responsible for deallocating the returned CBOR item
          */
         inline auto sendWithResponse(const uint8_t endpoint, struct cbor_item_t* &root) {
-            const auto tag = this->sendPacket(RequestEndpoint::Config, root);
+            const auto tag = this->sendPacket(endpoint, root);
             return this->readResponse(tag);
         }
 

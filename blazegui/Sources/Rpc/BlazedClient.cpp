@@ -11,11 +11,13 @@
 #include <cstring>
 #include <memory>
 #include <stdexcept>
+#include <sstream>
 #include <system_error>
 
 #include "Config/Reader.h"
 #include "Support/Cbor.h"
 #include "Support/EventLoop.h"
+#include "Support/HexDump.h"
 #include "Support/Logging.h"
 
 #include "BlazedClient.h"
@@ -196,8 +198,7 @@ uint8_t BlazedClient::sendPacket(const uint8_t endpoint, cbor_item_t* &root) {
 
     // then try to send the packet
     try {
-        tag = this->sendPacket(RequestEndpoint::Config,
-                {reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
+        tag = this->sendPacket(endpoint, {reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
         free(rootBuf);
     } catch(const std::exception &e) {
         free(rootBuf);
@@ -346,6 +347,77 @@ void BlazedClient::getRadioConfig(std::string &outRegion, size_t &outChannel, do
 
     // TODO: region string
 
+    cbor_decref(&response);
+}
+
+/**
+ * @brief Get radio statistics
+ *
+ * This reads out relevant performance counters of the radio.
+ *
+ * @param outRxGood Total number of successfully received frames
+ * @param outRxCorrupt Number of received frames with uncorrectable errors
+ * @param outRxFifoOverruns Receive packets dropped due to FIFO overruns
+ * @param outTxGood Total number of successfully transmitted frames (including beacons)
+ * @param outTxCcaFails Number of frames that failed transmission due to carriers sense failure
+ * @param outTxFifoUnderruns Transmit ackets dropped due to FIFO underruns
+ */
+void BlazedClient::getRadioStats(size_t &outRxGood, size_t &outRxCorrupt, size_t &outRxFifoOverruns,
+        size_t &outTxGood, size_t &outTxCcaFails, size_t &outTxFifoUnderruns) {
+    this->ensureConnection();
+    std::stringstream hexDump;
+
+    // submit request and receive response
+    auto root = cbor_new_definite_map(1);
+    cbor_map_add(root, (struct cbor_pair) {
+        .key = cbor_move(cbor_build_string("get")),
+        .value = cbor_move(cbor_build_string("radio.counters"))
+    });
+
+    auto response = this->sendWithResponse(RequestEndpoint::Status, root);
+
+    // decode response
+    const cbor_item_t *count{nullptr};
+
+    auto rxCounters = Support::CborMapGet(response, "rx");
+    if(rxCounters && cbor_isa_map(rxCounters)) {
+        count = Support::CborMapGet(rxCounters, "good");
+        if(count && cbor_isa_uint(count)) {
+            outRxGood = Support::CborReadUint(count);
+        }
+        count = Support::CborMapGet(rxCounters, "errors");
+        if(count && cbor_isa_uint(count)) {
+            outRxCorrupt = Support::CborReadUint(count);
+        }
+        count = Support::CborMapGet(rxCounters, "fifoOverruns");
+        if(count && cbor_isa_uint(count)) {
+            outRxFifoOverruns = Support::CborReadUint(count);
+        }
+    } else {
+        Support::HexDump::dumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
+        PLOG_WARNING << "invalid rx counters field: " << hexDump.str();
+    }
+
+    auto txCounters = Support::CborMapGet(response, "tx");
+    if(txCounters && cbor_isa_map(txCounters)) {
+        count = Support::CborMapGet(txCounters, "good");
+        if(count && cbor_isa_uint(count)) {
+            outTxGood = Support::CborReadUint(count);
+        }
+        count = Support::CborMapGet(txCounters, "ccaFails");
+        if(count && cbor_isa_uint(count)) {
+            outTxCcaFails = Support::CborReadUint(count);
+        }
+        count = Support::CborMapGet(txCounters, "fifoUnderruns");
+        if(count && cbor_isa_uint(count)) {
+            outTxFifoUnderruns = Support::CborReadUint(count);
+        }
+    } else {
+        Support::HexDump::dumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
+        PLOG_WARNING << "invalid tx counters field: " << hexDump.str();
+    }
+
+    // clean up
     cbor_decref(&response);
 }
 
