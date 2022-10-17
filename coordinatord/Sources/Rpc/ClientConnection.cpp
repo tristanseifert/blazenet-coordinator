@@ -15,6 +15,7 @@
 #include "Support/Logging.h"
 
 #include "Endpoints/Config.h"
+#include "Endpoints/Status.h"
 #include "Server.h"
 #include "Types.h"
 #include "ClientConnection.h"
@@ -158,6 +159,10 @@ void ClientConnection::handleRead() {
         switch(hdr->endpoint) {
             case RequestEndpoint::Config:
                 Endpoints::Config::Handle(this, cborItem);
+                break;
+
+            case RequestEndpoint::Status:
+                Endpoints::Status::Handle(this, cborItem);
                 break;
 
             // unimplemented endpoint

@@ -63,6 +63,13 @@ enum RequestEndpoint: uint8_t {
      * Allows reading out the running configuration of a variety of components.
      */
     Config                              = 0x01,
+
+    /**
+     * @brief Status endpoint
+     *
+     * Read out the current status of various components.
+     */
+    Status                              = 0x02,
 };
 }
 

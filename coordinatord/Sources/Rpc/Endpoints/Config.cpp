@@ -29,7 +29,8 @@ using namespace Rpc::Endpoints;
 void Config::Handle(ClientConnection *client, const cbor_item_t *payload) {
     if(auto get = Support::CborMapGet(payload, "get")) {
         if(cbor_isa_string(get)) {
-            std::string key(reinterpret_cast<char *>(cbor_string_handle(get)));
+            std::string key(reinterpret_cast<char *>(cbor_string_handle(get)),
+                    cbor_string_length(get));
             std::transform(key.begin(), key.end(), key.begin(),
                     [](unsigned char c){ return std::tolower(c); });
 
