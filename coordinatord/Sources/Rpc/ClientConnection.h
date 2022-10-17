@@ -50,6 +50,7 @@ class ClientConnection {
         }
 
         void reply(std::span<const std::byte> payload);
+        void reply(struct cbor_item_t* &root);
 
     private:
         void abort();

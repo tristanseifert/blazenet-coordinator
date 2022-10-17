@@ -18,8 +18,6 @@ class Config {
     private:
         static void GetRadioCfg(ClientConnection *, const struct cbor_item_t *);
         static void GetVersion(ClientConnection *, const struct cbor_item_t *);
-
-        static void Reply(ClientConnection *, struct cbor_item_t* &);
 };
 }
 

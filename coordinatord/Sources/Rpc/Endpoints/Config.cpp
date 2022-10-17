@@ -82,7 +82,7 @@ void Config::GetRadioCfg(ClientConnection *client, const cbor_item_t *) {
         .value = cbor_move(cbor_build_string(radio->getSerial().c_str())),
     });
 
-    Reply(client, root);
+    client->reply(root);
 }
 
 /**
@@ -112,25 +112,5 @@ void Config::GetVersion(ClientConnection *client, const cbor_item_t *) {
         .value = cbor_move(cbor_build_string(radio->getFwVersion().c_str())),
     });
 
-    Reply(client, root);
-}
-
-
-
-/**
- * @brief Serialize CBOR item and send as reply
- */
-void Config::Reply(ClientConnection *client, cbor_item_t* &root) {
-    size_t rootBufLen;
-    unsigned char *rootBuf{nullptr};
-    const size_t serializedBytes = cbor_serialize_alloc(root, &rootBuf, &rootBufLen);
-    cbor_decref(&root);
-
-    try {
-        client->reply({reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
-        free(rootBuf);
-    } catch(const std::exception &) {
-        free(rootBuf);
-        throw;
-    }
+    client->reply(root);
 }

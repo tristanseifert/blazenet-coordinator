@@ -229,6 +229,29 @@ void ClientConnection::reply(std::span<const std::byte> payload) {
 }
 
 /**
+ * @brief Serialize CBOR item and send as reply
+ *
+ * @param root CBOR item to serialize
+ *
+ * @remark This method will decrement a reference on the CBOR item, meaning that if the caller
+ *         does not increment the refcount beforehand, will lead to it being deallocated.
+ */
+void ClientConnection::reply(cbor_item_t* &root) {
+    size_t rootBufLen;
+    unsigned char *rootBuf{nullptr};
+    const size_t serializedBytes = cbor_serialize_alloc(root, &rootBuf, &rootBufLen);
+    cbor_decref(&root);
+
+    try {
+        this->reply({reinterpret_cast<std::byte *>(rootBuf), serializedBytes});
+        free(rootBuf);
+    } catch(const std::exception &) {
+        free(rootBuf);
+        throw;
+    }
+}
+
+/**
  * @brief Send a raw packet to the remote
  *
  * This assumes the packet already has a `struct RpcHeader` prepended.
