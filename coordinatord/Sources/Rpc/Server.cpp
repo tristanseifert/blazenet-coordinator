@@ -39,8 +39,6 @@ Server::Server(const std::shared_ptr<Radio> &radio,
 
     // set up the socket
     this->initSocket(socketPath.value_or(""));
-    this->listen();
-    this->initListenEvent();
 
     // client management stuff
     this->initClientGc();
@@ -57,81 +55,10 @@ Server::Server(const std::shared_ptr<Radio> &radio,
  * @remark Any existing file at the specified socket path will be deleted.
  */
 void Server::initSocket(const std::string_view &path) {
-    int err;
-
-    // create the socket
-    err = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "create rpc socket");
-    }
-
-    this->listenSock = err;
-
-    // delete previous file, if any, then bind to that path
-    PLOG_DEBUG << "Local RPC socket path: '" << path << "'";
-
-    err = unlink(path.data());
-    if(err == -1 && errno != ENOENT) {
-        throw std::system_error(errno, std::generic_category(), "unlink rpc socket");
-    }
-
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path.data(), sizeof(addr.sun_path) - 1);
-
-    err = bind(this->listenSock, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "bind rpc socket");
-    }
-
-    // make listening socket non-blocking (to allow accept calls)
-    err = fcntl(this->listenSock, F_GETFL);
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "get rpc socket flags");
-    }
-
-    err = fcntl(this->listenSock, F_SETFL, err | O_NONBLOCK);
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "set rpc socket flags");
-    }
-}
-
-/**
- * @brief Listen for connections on the RPC socket
- *
- * Begin accepting new clients on the RPC socket.
- */
-void Server::listen() {
-    int err = ::listen(this->listenSock, kListenBacklog);
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "listen rpc socket");
-    }
-}
-
-/**
- * @brief Initialize the socket listen event
- *
- * This triggers when a new client connects to the RPC socket; it will allocate a client struct for
- * it and create a client event source as well.
- */
-void Server::initListenEvent() {
-    // TODO: convert to TristLib listen event
-    auto evbase = TristLib::Event::RunLoop::Current()->getEvBase();
-    this->listenEvent = event_new(evbase, this->listenSock, (EV_READ | EV_PERSIST),
-            [](auto fd, auto what, auto ctx) {
-        try {
-            reinterpret_cast<Server *>(ctx)->acceptClient();
-        } catch(const std::exception &e) {
-            PLOG_ERROR << "failed to accept client: " << e.what();
-        }
-    }, this);
-    if(!this->listenEvent) {
-        throw std::runtime_error("failed to allocate listen event");
-    }
-
-    event_add(this->listenEvent, nullptr);
+    this->listenEvent = std::make_shared<TristLib::Event::ListenSocket>(
+        TristLib::Event::RunLoop::Current(), [this](auto ev) {
+            this->acceptClient();
+    }, path, true, SOCK_SEQPACKET);
 }
 
 /**
@@ -161,15 +88,7 @@ Server::~Server() {
     this->clients.clear();
 
     // shut down accept event
-    if(this->listenEvent) {
-        event_del(this->listenEvent);
-        event_free(this->listenEvent);
-    }
-
-    // close listening socket
-    if(this->listenSock != -1) {
-        close(this->listenSock);
-    }
+    this->listenEvent.reset();
 }
 
 
@@ -193,7 +112,7 @@ void Server::reloadConfig() {
  */
 void Server::acceptClient() {
     // accept client socket
-    int fd = accept(this->listenSock, nullptr, nullptr);
+    int fd = accept(this->listenEvent->getFd(), nullptr, nullptr);
     if(fd == -1) {
         throw std::system_error(errno, std::generic_category(), "accept");
     }

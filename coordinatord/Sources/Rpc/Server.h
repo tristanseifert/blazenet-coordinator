@@ -6,6 +6,7 @@
 #include <memory>
 
 namespace TristLib::Event {
+class ListenSocket;
 class Timer;
 }
 
@@ -47,8 +48,6 @@ class Server {
 
     private:
         void initSocket(const std::string_view &listenPath);
-        void listen();
-        void initListenEvent();
 
         void initClientGc();
         void garbageCollectClients();
@@ -70,10 +69,8 @@ class Server {
         /// BlazeNet protocol handler
         std::weak_ptr<Protocol::Handler> protocol;
 
-        /// RPC listening socket
-        int listenSock{-1};
         /// Event for the listening socket (triggered on accept)
-        struct event *listenEvent{nullptr};
+        std::shared_ptr<TristLib::Event::ListenSocket> listenEvent;
 
         /// Timer event to garbage collect disconnected clients
         std::shared_ptr<TristLib::Event::Timer> clientGcTimer;
