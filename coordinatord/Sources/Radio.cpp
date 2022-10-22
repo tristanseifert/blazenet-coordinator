@@ -5,10 +5,11 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
+
 #include "Config/Reader.h"
 #include "Support/Confd.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
 #include "Transports/Base.h"
 #include "Transports/Commands.h"
 
@@ -86,21 +87,10 @@ Radio::Radio(const std::shared_ptr<Transports::TransportBase> &_transport) : tra
  * Notify the radio that we're going away, then tear down all resources associated with the radio.
  */
 Radio::~Radio() {
-    // stop performance counter reading in the background
-    if(this->counterReader) {
-        event_del(this->counterReader);
-        event_free(this->counterReader);
-    }
-
-    if(this->irqWatchdog) {
-        event_del(this->irqWatchdog);
-        event_free(this->irqWatchdog);
-    }
-
-    if(this->pollTimer) {
-        event_del(this->pollTimer);
-        event_free(this->pollTimer);
-    }
+    // reset background timers
+    this->counterReader.reset();
+    this->irqWatchdog.reset();
+    this->pollTimer.reset();
 }
 
 
@@ -309,21 +299,10 @@ void Radio::resetCounters(const bool remote) {
  * @seeAlso counterReaderFired
  */
 void Radio::initCounterReader() {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
-    this->counterReader = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Radio *>(ctx)->counterReaderFired();
-    }, this);
-    if(!this->counterReader) {
-        throw std::runtime_error("failed to allocate performance counter reading event");
-    }
-
-    // set the interval
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(kPerfCounterReadInterval),
-        .tv_usec = static_cast<suseconds_t>(0),
-    };
-
-    evtimer_add(this->counterReader, &tv);
+    this->counterReader = std::make_shared<TristLib::Event::Timer>(
+            TristLib::Event::RunLoop::Current(), kPerfCounterReadInterval, [this](auto timer) {
+        this->counterReaderFired();
+    }, true);
 }
 
 /**
@@ -401,25 +380,12 @@ void Radio::queryCounters() {
  * @param interval Polling interval, in msec
  */
 void Radio::initPolling(const std::chrono::milliseconds interval) {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
+    this->pollTimer = std::make_shared<TristLib::Event::Timer>(
+            TristLib::Event::RunLoop::Current(), interval, [this](auto timer) {
+        this->pollTimerFired();
+    }, true);
 
-    // set up the timer object
-    this->pollTimer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Radio *>(ctx)->pollTimerFired();
-    }, this);
-    if(!this->pollTimer) {
-        throw std::runtime_error("failed to allocate poll timer event");
-    }
-
-    // set the interval
-    const auto usec{interval.count() * 1000};
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
-        .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
-    };
-
-    evtimer_add(this->pollTimer, &tv);
-    PLOG_DEBUG << "Radio poll interval: " << usec << " µS";
+    PLOG_DEBUG << "Radio poll interval: " << interval.count() << " ms";
 }
 
 /**
@@ -446,32 +412,22 @@ void Radio::pollTimerFired() {
  * lost.
  */
 void Radio::initWatchdog() {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
-
-    this->irqWatchdog = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Radio *>(ctx)->irqWatchdogFired();
-    }, this);
-    if(!this->irqWatchdog) {
-        throw std::runtime_error("failed to allocate irq watchdog event");
-    }
-
     // get interval from config
-    size_t usec{kIrqWatchdogInterval * 1000};
+    size_t msec{kIrqWatchdogInterval};
 
     auto item = Config::GetConfig().at_path("radio.general.irqWatchdogInterval");
     if(item && item.is_number()) {
-        usec = item.value_or(kIrqWatchdogInterval) * 1000;
+        msec = item.value_or(kIrqWatchdogInterval);
     }
 
-    PLOG_VERBOSE << "irq watchdog timeout: " << usec << " µS";
+    PLOG_VERBOSE << "irq watchdog timeout: " << msec << " ms";
 
-    // set the interval
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(usec / 1'000'000U),
-        .tv_usec = static_cast<suseconds_t>(usec % 1'000'000U),
-    };
-
-    evtimer_add(this->irqWatchdog, &tv);
+    // create timer
+    this->irqWatchdog = std::make_shared<TristLib::Event::Timer>(
+            TristLib::Event::RunLoop::Current(), std::chrono::milliseconds(msec),
+        [this](auto timer) {
+        this->irqWatchdogFired();
+    }, true);
 }
 
 /**

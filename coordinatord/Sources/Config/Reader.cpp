@@ -1,12 +1,13 @@
 #include <fmt/format.h>
 #include <toml++/toml.h>
 
+#include <TristLib/Core.h>
+
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
 
-#include "Support/Logging.h"
 #include "Config/Reader.h"
 
 using namespace Config;

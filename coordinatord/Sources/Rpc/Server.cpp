@@ -5,8 +5,9 @@
 
 #include <event2/event.h>
 #include <event2/buffer.h>
-#include <event2/bufferevent.h>
 #include <fmt/format.h>
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
 
 #include <cerrno>
 #include <stdexcept>
@@ -14,8 +15,6 @@
 
 #include "Config/Reader.h"
 #include "Support/Confd.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
 
 #include "ClientConnection.h"
 #include "Server.h"
@@ -118,7 +117,8 @@ void Server::listen() {
  * it and create a client event source as well.
  */
 void Server::initListenEvent() {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
+    // TODO: convert to TristLib listen event
+    auto evbase = TristLib::Event::RunLoop::Current()->getEvBase();
     this->listenEvent = event_new(evbase, this->listenSock, (EV_READ | EV_PERSIST),
             [](auto fd, auto what, auto ctx) {
         try {
@@ -141,23 +141,11 @@ void Server::initListenEvent() {
  * will reclaim various resources associated with them.
  */
 void Server::initClientGc() {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
-    this->clientGcTimer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        auto server = reinterpret_cast<Server *>(ctx);
-        server->numOffCycleGc = 0;
-        server->garbageCollectClients();
-    }, this);
-    if(!this->clientGcTimer) {
-        throw std::runtime_error("failed to allocate client gc timer");
-    }
-
-    // set the interval
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(kClientGcInterval),
-        .tv_usec = static_cast<suseconds_t>(0),
-    };
-
-    evtimer_add(this->clientGcTimer, &tv);
+    this->clientGcTimer = std::make_shared<TristLib::Event::Timer>(
+        TristLib::Event::RunLoop::Current(), kClientGcInterval, [this](auto timer) {
+        this->numOffCycleGc = 0;
+        this->garbageCollectClients();
+    }, true);
 }
 
 /**
@@ -167,10 +155,7 @@ void Server::initClientGc() {
  */
 Server::~Server() {
     // clean up client garbage collector
-    if(this->clientGcTimer) {
-        event_del(this->clientGcTimer);
-        event_free(this->clientGcTimer);
-    }
+    this->clientGcTimer.reset();
 
     // TODO: shut down clients
     this->clients.clear();

@@ -1,6 +1,10 @@
 #include <cbor.h>
 #include <fmt/format.h>
 
+#include <TristLib/Core.h>
+#include <TristLib/Core/Cbor.h>
+#include <TristLib/Event.h>
+
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
@@ -9,8 +13,6 @@
 #include "Radio.h"
 #include "Rpc/ClientConnection.h"
 #include "Rpc/Server.h"
-#include "Support/Cbor.h"
-#include "Support/Logging.h"
 
 #include "Status.h"
 
@@ -25,7 +27,7 @@ using namespace Rpc::Endpoints;
  * - radio.packet: Packet statistics (rx/tx performance counters)
  */
 void Status::Handle(ClientConnection *client, const cbor_item_t *payload) {
-    if(auto get = Support::CborMapGet(payload, "get")) {
+    if(auto get = TristLib::Core::CborMapGet(payload, "get")) {
         if(cbor_isa_string(get)) {
             std::string key(reinterpret_cast<char *>(cbor_string_handle(get)),
                     cbor_string_length(get));

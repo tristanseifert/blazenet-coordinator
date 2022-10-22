@@ -7,10 +7,10 @@
 #include <event2/event.h>
 #include <fmt/format.h>
 
+#include <TristLib/Core.h>
+#include <TristLib/Core/HexDump.h>
+
 #include "Support/Confd.h"
-#include "Support/EventLoop.h"
-#include "Support/HexDump.h"
-#include "Support/Logging.h"
 #include "Radio.h"
 #include "Handler.h"
 #include "Beaconator.h"
@@ -126,7 +126,7 @@ void Beaconator::updateBeaconBuffer() {
     // secrete the final frame (for debugging)
     if(kLogBeaconFrame) {
         std::stringstream str;
-        Support::HexDump::dumpBuffer<std::stringstream, std::byte>(str, this->buffer);
+        TristLib::Core::HexDump::DumpBuffer<std::stringstream, std::byte>(str, this->buffer);
         PLOG_DEBUG << "Beacon frame:" << std::endl << str.str();
     }
 }

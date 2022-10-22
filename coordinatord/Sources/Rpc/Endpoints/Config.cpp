@@ -1,6 +1,10 @@
 #include <cbor.h>
 #include <fmt/format.h>
 
+#include <TristLib/Core.h>
+#include <TristLib/Core/Cbor.h>
+#include <TristLib/Event.h>
+
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
@@ -10,8 +14,6 @@
 #include "version.h"
 #include "Rpc/ClientConnection.h"
 #include "Rpc/Server.h"
-#include "Support/Cbor.h"
-#include "Support/Logging.h"
 
 #include "Config.h"
 
@@ -27,7 +29,7 @@ using namespace Rpc::Endpoints;
  *         most changeable config is stored in confd, which can easily be updated.
  */
 void Config::Handle(ClientConnection *client, const cbor_item_t *payload) {
-    if(auto get = Support::CborMapGet(payload, "get")) {
+    if(auto get = TristLib::Core::CborMapGet(payload, "get")) {
         if(cbor_isa_string(get)) {
             std::string key(reinterpret_cast<char *>(cbor_string_handle(get)),
                     cbor_string_length(get));

@@ -14,8 +14,8 @@
 #include <event2/util.h>
 #include <fmt/format.h>
 
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
 
 #include "Transports/Spidev.h"
 
@@ -171,7 +171,8 @@ void Spidev::initIrq(const std::string &lineDesc) {
                 fmt::format("make irq events fd nonblocking ({})", lineDesc));
     }
 
-    auto evbase = Support::EventLoop::Current()->getEvBase();
+    // TODO: replace with TristLib event wrapper
+    auto evbase = TristLib::Event::RunLoop::Current()->getEvBase();
     auto ev = event_new(evbase, eventFd, EV_READ | EV_PERSIST, [](auto fd, auto ev, auto ctx) {
         reinterpret_cast<Spidev *>(ctx)->handleIrq(fd, ev);
     }, this);

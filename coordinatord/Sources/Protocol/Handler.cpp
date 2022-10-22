@@ -1,14 +1,3 @@
-#include <cmath>
-#include <stdexcept>
-#include <sys/time.h>
-
-#include <BlazeNet/Types.h>
-#include <fmt/format.h>
-#include <event2/event.h>
-
-#include "Support/Confd.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
 #include "Radio.h"
 #include "Beaconator.h"
 #include "Handler.h"

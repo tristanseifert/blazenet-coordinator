@@ -7,12 +7,11 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <fmt/format.h>
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
 
 #include <span>
 #include <stdexcept>
-
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
 
 #include "Endpoints/Config.h"
 #include "Endpoints/Status.h"
@@ -31,7 +30,8 @@ using namespace Rpc;
  */
 ClientConnection::ClientConnection(Server *parent, const int socketFd) : server(parent),
     socket(socketFd) {
-    auto evbase = Support::EventLoop::Current()->getEvBase();
+    // TODO: convert to TristLib listen event
+    auto evbase = TristLib::Event::RunLoop::Current()->getEvBase();
 
     // create buffer event
     auto bev = bufferevent_socket_new(evbase, socketFd, BEV_OPT_CLOSE_ON_FREE);

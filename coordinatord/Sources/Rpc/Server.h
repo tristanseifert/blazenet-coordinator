@@ -1,8 +1,13 @@
 #ifndef RPC_SERVER_H
 #define RPC_SERVER_H
 
+#include <chrono>
 #include <list>
 #include <memory>
+
+namespace TristLib::Event {
+class Timer;
+}
 
 class Radio;
 namespace Protocol {
@@ -56,7 +61,7 @@ class Server {
         /// Maximum number of simultaneous connected clients
         constexpr static const size_t kMaxClients{100};
         /// Interval for client garbage collection (sec)
-        constexpr static const size_t kClientGcInterval{15};
+        constexpr static const std::chrono::seconds kClientGcInterval{15};
         /// Maximum number of times garbage collection can be invoked between scheduled intervals
         constexpr static const size_t kClientGcMaxOffcycle{10};
 
@@ -71,7 +76,7 @@ class Server {
         struct event *listenEvent{nullptr};
 
         /// Timer event to garbage collect disconnected clients
-        struct event *clientGcTimer{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> clientGcTimer;
         /// List containing all connected clients
         std::list<std::shared_ptr<ClientConnection>> clients;
 

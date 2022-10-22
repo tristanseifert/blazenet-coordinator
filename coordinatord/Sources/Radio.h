@@ -13,6 +13,10 @@
 #include <vector>
 #include <queue>
 
+namespace TristLib::Event {
+class Timer;
+}
+
 namespace Transports {
 class TransportBase;
 
@@ -170,7 +174,7 @@ class Radio {
         /// Minimum beacon interval (msec)
         constexpr static const size_t kMinBeaconInterval{1'000};
         /// Performance counter read interval (sec)
-        constexpr static const size_t kPerfCounterReadInterval{30};
+        constexpr static const std::chrono::seconds kPerfCounterReadInterval{30};
 
         /// Interrupt watchdog interval (msec)
         constexpr static const size_t kIrqWatchdogInterval{50};
@@ -394,19 +398,19 @@ class Radio {
         /// Number of interrupts triggered
         size_t irqCounter{0};
         /// Irq watchdog timer
-        struct event *irqWatchdog{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> irqWatchdog;
         /// last irq
         std::chrono::time_point<std::chrono::high_resolution_clock> lastIrq;
 
         /// Periodic event to read out the performance counters
-        struct event *counterReader{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> counterReader;
         /// TX performance counters
         TxCounters txCounters{};
         /// RX performance counters
         RxCounters rxCounters{};
 
         /// Radio status polling timer
-        struct event *pollTimer{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> pollTimer;
 };
 
 #endif

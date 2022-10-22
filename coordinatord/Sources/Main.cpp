@@ -2,6 +2,9 @@
 #include <unistd.h>
 #include <event2/event.h>
 
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
+
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -15,15 +18,17 @@
 #include "Protocol/Handler.h"
 #include "Rpc/Server.h"
 #include "Support/Confd.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
-#include "Support/Watchdog.h"
 #include "Transports/Base.h"
 
 /// Set for as long as we should continue processing requests
 std::atomic_bool gRun{true};
 /// Main run loop
-static std::shared_ptr<Support::EventLoop> gMainLoop;
+static std::shared_ptr<TristLib::Event::RunLoop> gMainLoop;
+/// Job supervisor watchdog
+static std::shared_ptr<TristLib::Event::SystemWatchdog> gWdog;
+/// Ctrl+C handler
+static std::shared_ptr<TristLib::Event::Signal> gSignalHandler;
+
 /// Packet handler
 static std::shared_ptr<Protocol::Handler> gHandler;
 /// Local RPC server
@@ -95,16 +100,36 @@ static void ParseArgs(const int argc, char **argv) {
 }
 
 /**
+ * @brief Initialize the run loop
+ */
+static void InitRunLoop() {
+    // create the loop
+    gMainLoop = std::make_shared<TristLib::Event::RunLoop>();
+    gMainLoop->arm();
+
+    // set up signal handler
+    gSignalHandler = std::make_shared<TristLib::Event::Signal>(gMainLoop,
+            TristLib::Event::Signal::kQuitEvents, [](auto) {
+        PLOG_WARNING << "Received signal, terminating…";
+        gRun = false;
+        gMainLoop->interrupt();
+    });
+
+    // set up system watchdog
+    gWdog = std::make_shared<TristLib::Event::SystemWatchdog>(gMainLoop);
+}
+
+/**
  * @brief Run the deamon's main loop
  */
 static void RunMainLoop() {
-    Support::Watchdog::Start();
+    gWdog->start();
 
     while(gRun) {
         gMainLoop->run();
     }
 
-    Support::Watchdog::Stop();
+    gWdog->stop();
 }
 
 /**
@@ -119,15 +144,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
+    TristLib::Core::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
     PLOG_INFO << "Starting blazed version " << kVersion << " (" << kVersionGitHash << ")";
 
-    // initialize the event loop, then do config initialization
-    Support::Watchdog::Init();
+    // set up run loop
+    InitRunLoop();
 
-    gMainLoop = std::make_shared<Support::EventLoop>(true);
-    gMainLoop->arm();
-
+    // read config file and set up confd
     try {
         Config::Read(gCliConfig.configFilePath);
     } catch(const std::exception &e) {

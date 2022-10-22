@@ -46,6 +46,8 @@ if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
     find_package(plog REQUIRED)
     find_package(tomlplusplus REQUIRED)
+
+    # TODO: find tristlib externally
 else()
     FetchContent_Declare(
         fmt
@@ -64,8 +66,12 @@ else()
         GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
         GIT_TAG        v3.2.0
     )
+    FetchContent_Declare(
+        tristlib
+        GIT_REPOSITORY https://github.com/tristanseifert/TristLib.git
+    )
 
-    FetchContent_MakeAvailable(fmt plog tomlplusplus)
+    FetchContent_MakeAvailable(fmt plog tomlplusplus tristlib)
 endif()
 
 ###############
@@ -94,9 +100,6 @@ add_executable(daemon
     Sources/Protocol/Handler.cpp
     Sources/Protocol/Beaconator.cpp
     Sources/Config/Reader.cpp
-    Sources/Support/EventLoop.cpp
-    Sources/Support/Logging.cpp
-    Sources/Support/Watchdog.cpp
     Sources/Transports/Base.cpp
     Sources/Rpc/Server.cpp
     Sources/Rpc/ClientConnection.cpp
@@ -116,7 +119,7 @@ endif()
 
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
-target_link_libraries(daemon PRIVATE SQLite::SQLite3 plog::plog fmt::fmt OpenSSL::SSL
+target_link_libraries(daemon PRIVATE SQLite::SQLite3 fmt::fmt OpenSSL::SSL TristLib::TristLib
     OpenSSL::Crypto tomlplusplus::tomlplusplus blazenet::types)
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
