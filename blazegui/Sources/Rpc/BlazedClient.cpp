@@ -3,7 +3,6 @@
 #include <sys/un.h>
 
 #include <cbor.h>
-#include <event2/event.h>
 #include <fmt/format.h>
 #include <TristLib/Core.h>
 #include <TristLib/Core/Cbor.h>

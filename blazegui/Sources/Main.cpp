@@ -1,7 +1,6 @@
 #include <getopt.h>
 #include <unistd.h>
 
-#include <event2/event.h>
 #include <fmt/format.h>
 
 #include <atomic>
@@ -27,6 +26,8 @@ static std::atomic_bool gRun{true};
 static std::shared_ptr<TristLib::Event::RunLoop> gMainLoop;
 /// Job supervisor watchdog
 static std::shared_ptr<TristLib::Event::SystemWatchdog> gWdog;
+/// Ctrl+C handler
+static std::shared_ptr<TristLib::Event::Signal> gSignalHandler;
 
 /// GUI display manager: draws the UI
 static std::shared_ptr<Gui::DisplayManager> gGuiDispMan;
@@ -105,7 +106,12 @@ static void InitRunLoop() {
     gMainLoop->arm();
 
     // set up signal handler
-    // TODO
+    gSignalHandler = std::make_shared<TristLib::Event::Signal>(gMainLoop,
+            TristLib::Event::Signal::kQuitEvents, [](auto) {
+        PLOG_WARNING << "Received signal, terminating…";
+        gRun = false;
+        gMainLoop->interrupt();
+    });
 
     // set up system watchdog
     gWdog = std::make_shared<TristLib::Event::SystemWatchdog>(gMainLoop);

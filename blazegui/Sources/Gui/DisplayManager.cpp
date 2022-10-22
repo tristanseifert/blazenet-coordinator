@@ -1,5 +1,4 @@
 #include <cairo.h>
-#include <event2/event.h>
 
 #include <fmt/format.h>
 #include <TristLib/Core.h>
