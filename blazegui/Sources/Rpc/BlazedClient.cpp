@@ -5,6 +5,9 @@
 #include <cbor.h>
 #include <event2/event.h>
 #include <fmt/format.h>
+#include <TristLib/Core.h>
+#include <TristLib/Core/Cbor.h>
+#include <TristLib/Core/HexDump.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -15,10 +18,6 @@
 #include <system_error>
 
 #include "Config/Reader.h"
-#include "Support/Cbor.h"
-#include "Support/EventLoop.h"
-#include "Support/HexDump.h"
-#include "Support/Logging.h"
 
 #include "BlazedClient.h"
 
@@ -291,19 +290,19 @@ void BlazedClient::getVersion(std::string &outVersion, std::string &outBuild,
     auto response = this->sendWithResponse(RequestEndpoint::Config, root);
 
     // decode response
-    if(auto version = Support::CborMapGet(response, "version")) {
+    if(auto version = TristLib::Core::CborMapGet(response, "version")) {
         if(cbor_isa_string(version)) {
             outVersion = std::string(reinterpret_cast<const char *>(cbor_string_handle(version)));
         }
     }
 
-    if(auto build = Support::CborMapGet(response, "build")) {
+    if(auto build = TristLib::Core::CborMapGet(response, "build")) {
         if(cbor_isa_string(build)) {
             outBuild = std::string(reinterpret_cast<const char *>(cbor_string_handle(build)));
         }
     }
 
-    if(auto version = Support::CborMapGet(response, "radioVersion")) {
+    if(auto version = TristLib::Core::CborMapGet(response, "radioVersion")) {
         if(cbor_isa_string(version)) {
             outRadioVersion = std::string(
                     reinterpret_cast<const char *>(cbor_string_handle(version)));
@@ -333,15 +332,15 @@ void BlazedClient::getRadioConfig(std::string &outRegion, size_t &outChannel, do
     auto response = this->sendWithResponse(RequestEndpoint::Config, root);
 
     // decode response
-    if(auto channel = Support::CborMapGet(response, "channel")) {
+    if(auto channel = TristLib::Core::CborMapGet(response, "channel")) {
         if(cbor_isa_uint(channel)) {
-            outChannel = Support::CborReadUint(channel);
+            outChannel = TristLib::Core::CborReadUint(channel);
         }
     }
 
-    if(auto txPower = Support::CborMapGet(response, "txPower")) {
+    if(auto txPower = TristLib::Core::CborMapGet(response, "txPower")) {
         if(cbor_isa_float_ctrl(txPower)) {
-            outTxPower = Support::CborReadFloat(txPower);
+            outTxPower = TristLib::Core::CborReadFloat(txPower);
         }
     }
 
@@ -379,41 +378,41 @@ void BlazedClient::getRadioStats(size_t &outRxGood, size_t &outRxCorrupt, size_t
     // decode response
     const cbor_item_t *count{nullptr};
 
-    auto rxCounters = Support::CborMapGet(response, "rx");
+    auto rxCounters = TristLib::Core::CborMapGet(response, "rx");
     if(rxCounters && cbor_isa_map(rxCounters)) {
-        count = Support::CborMapGet(rxCounters, "good");
+        count = TristLib::Core::CborMapGet(rxCounters, "good");
         if(count && cbor_isa_uint(count)) {
-            outRxGood = Support::CborReadUint(count);
+            outRxGood = TristLib::Core::CborReadUint(count);
         }
-        count = Support::CborMapGet(rxCounters, "errors");
+        count = TristLib::Core::CborMapGet(rxCounters, "errors");
         if(count && cbor_isa_uint(count)) {
-            outRxCorrupt = Support::CborReadUint(count);
+            outRxCorrupt = TristLib::Core::CborReadUint(count);
         }
-        count = Support::CborMapGet(rxCounters, "fifoOverruns");
+        count = TristLib::Core::CborMapGet(rxCounters, "fifoOverruns");
         if(count && cbor_isa_uint(count)) {
-            outRxFifoOverruns = Support::CborReadUint(count);
+            outRxFifoOverruns = TristLib::Core::CborReadUint(count);
         }
     } else {
-        Support::HexDump::dumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
+        TristLib::Core::HexDump::DumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
         PLOG_WARNING << "invalid rx counters field: " << hexDump.str();
     }
 
-    auto txCounters = Support::CborMapGet(response, "tx");
+    auto txCounters = TristLib::Core::CborMapGet(response, "tx");
     if(txCounters && cbor_isa_map(txCounters)) {
-        count = Support::CborMapGet(txCounters, "good");
+        count = TristLib::Core::CborMapGet(txCounters, "good");
         if(count && cbor_isa_uint(count)) {
-            outTxGood = Support::CborReadUint(count);
+            outTxGood = TristLib::Core::CborReadUint(count);
         }
-        count = Support::CborMapGet(txCounters, "ccaFails");
+        count = TristLib::Core::CborMapGet(txCounters, "ccaFails");
         if(count && cbor_isa_uint(count)) {
-            outTxCcaFails = Support::CborReadUint(count);
+            outTxCcaFails = TristLib::Core::CborReadUint(count);
         }
-        count = Support::CborMapGet(txCounters, "fifoUnderruns");
+        count = TristLib::Core::CborMapGet(txCounters, "fifoUnderruns");
         if(count && cbor_isa_uint(count)) {
-            outTxFifoUnderruns = Support::CborReadUint(count);
+            outTxFifoUnderruns = TristLib::Core::CborReadUint(count);
         }
     } else {
-        Support::HexDump::dumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
+        TristLib::Core::HexDump::DumpBuffer<std::stringstream, std::byte>(hexDump, this->rxBuffer);
         PLOG_WARNING << "invalid tx counters field: " << hexDump.str();
     }
 

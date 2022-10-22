@@ -51,8 +51,6 @@ class Info: public Screen {
         };
 
     public:
-        ~Info();
-
         void draw(struct _cairo *ctx, const bool dirty) override;
 
         /// Return the state of a flag that's updated when the timer changes the page
@@ -96,7 +94,7 @@ class Info: public Screen {
         /// Current info page to display
         Section page{Section::Network};
         /// Periodic update timer (to cycle through screens)
-        struct event *timer{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> timer;
         /// Number of redraw cycles we've gone through
         size_t pageCycles{0};
 };

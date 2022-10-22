@@ -10,9 +10,9 @@
 
 #include <gpiod.h>
 #include <fmt/format.h>
+#include <TristLib/Core.h>
 
 #include "Support/Gpio.h"
-#include "Support/Logging.h"
 
 #include "St7789.h"
 

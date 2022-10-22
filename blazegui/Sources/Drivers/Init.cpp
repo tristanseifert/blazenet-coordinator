@@ -1,9 +1,9 @@
 #include <fmt/format.h>
+#include <TristLib/Core.h>
 
 #include <stdexcept>
 
 #include "Config/Reader.h"
-#include "Support/Logging.h"
 
 #include "Drivers/Display/Base.h"
 #include "Drivers/Display/St7789.h"

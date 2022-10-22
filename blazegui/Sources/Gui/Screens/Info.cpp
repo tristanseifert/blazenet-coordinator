@@ -1,6 +1,8 @@
 #include <cairo.h>
 #include <event2/event.h>
 #include <fmt/format.h>
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
 
 #include <algorithm>
 #include <array>
@@ -23,8 +25,6 @@
 #include "Gui/DisplayManager.h"
 #include "Gui/TextRenderer.h"
 #include "Rpc/BlazedClient.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
 
 #include "Info.h"
 
@@ -46,16 +46,6 @@ const std::unordered_map<Info::Section, std::tuple<double, double, double>> Info
 
 
 /**
- * @brief Release drawing resources
- */
-Info::~Info() {
-    if(this->timer) {
-        event_del(this->timer);
-        event_free(this->timer);
-    }
-}
-
-/**
  * @brief View is about to appear
  *
  * Set up and start the page flip timer
@@ -63,27 +53,12 @@ Info::~Info() {
 void Info::didAppear(DisplayManager *mgr) {
     Screen::didAppear(mgr);
 
-    // kill old one, if any
-    if(this->timer) {
-        event_del(this->timer);
-        event_free(this->timer);
-    }
-
     // create it
-    auto evbase = Support::EventLoop::Current()->getEvBase();
-    this->timer = event_new(evbase, -1, EV_PERSIST, [](auto, auto, auto ctx) {
-        reinterpret_cast<Info *>(ctx)->timerFired();
-    }, this);
-    if(!this->timer) {
-        throw std::runtime_error("failed to allocate timer");
-    }
-
-    struct timeval tv{
-        .tv_sec  = static_cast<time_t>(kPageFlipInterval / 1'000'000U),
-        .tv_usec = static_cast<suseconds_t>(kPageFlipInterval % 1'000'000U),
-    };
-
-    evtimer_add(this->timer, &tv);
+    this->timer = std::make_shared<TristLib::Event::Timer>(
+            TristLib::Event::RunLoop::Current(), std::chrono::microseconds(kPageFlipInterval),
+            [this](auto timer) {
+        this->timerFired();
+    }, true);
 }
 
 /**
@@ -95,12 +70,7 @@ void Info::willDisappear(DisplayManager *mgr) {
     Screen::willDisappear(mgr);
 
     // kill the timer
-    if(this->timer) {
-        event_del(this->timer);
-        event_free(this->timer);
-
-        this->timer = nullptr;
-    }
+    this->timer.reset();
 }
 
 /**

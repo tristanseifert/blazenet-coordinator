@@ -74,6 +74,8 @@ if(${EXPECT_DEPENDENCIES_LOCAL})
     find_package(fmt REQUIRED)
     find_package(plog REQUIRED)
     find_package(tomlplusplus REQUIRED)
+
+    # TODO: find tristlib externally
 else()
     FetchContent_Declare(
         fmt
@@ -92,8 +94,12 @@ else()
         GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
         GIT_TAG        v3.2.0
     )
+    FetchContent_Declare(
+        tristlib
+        GIT_REPOSITORY https://github.com/tristanseifert/TristLib.git
+    )
 
-    FetchContent_MakeAvailable(fmt plog tomlplusplus)
+    FetchContent_MakeAvailable(fmt plog tomlplusplus tristlib)
 endif()
 
 ###############
@@ -119,15 +125,13 @@ add_executable(daemon
     Sources/Drivers/Display/St7789.cpp
     Sources/Gui/DisplayManager.cpp
     Sources/Gui/Screens/Info.cpp
-    Sources/Support/EventLoop.cpp
-    Sources/Support/Logging.cpp
-    Sources/Support/Watchdog.cpp
     Sources/Rpc/BlazedClient.cpp
 )
 
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Sources)
 target_include_directories(daemon PRIVATE ${CMAKE_CURRENT_LIST_DIR}/Include)
-target_link_libraries(daemon PRIVATE plog::plog fmt::fmt tomlplusplus::tomlplusplus)
+target_link_libraries(daemon PRIVATE plog::plog fmt::fmt tomlplusplus::tomlplusplus
+    TristLib::TristLib)
 
 target_include_directories(daemon PRIVATE ${PKG_LIBEVENT_INCLUDE_DIRS} ${PKG_LIBCBOR_INCLUDE_DIRS})
 target_link_libraries(daemon PRIVATE ${PKG_LIBEVENT_LIBRARIES} ${PKG_LIBCBOR_LIBRARIES})

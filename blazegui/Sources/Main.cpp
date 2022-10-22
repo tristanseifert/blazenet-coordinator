@@ -17,14 +17,16 @@
 #include "Gui/DisplayManager.h"
 #include "Gui/Screens/Info.h"
 #include "Rpc/BlazedClient.h"
-#include "Support/EventLoop.h"
-#include "Support/Logging.h"
-#include "Support/Watchdog.h"
+
+#include <TristLib/Core.h>
+#include <TristLib/Event.h>
 
 /// Set for as long as we should continue running
-std::atomic_bool gRun{true};
+static std::atomic_bool gRun{true};
 /// Main run loop
-static std::shared_ptr<Support::EventLoop> gMainLoop;
+static std::shared_ptr<TristLib::Event::RunLoop> gMainLoop;
+/// Job supervisor watchdog
+static std::shared_ptr<TristLib::Event::SystemWatchdog> gWdog;
 
 /// GUI display manager: draws the UI
 static std::shared_ptr<Gui::DisplayManager> gGuiDispMan;
@@ -95,16 +97,31 @@ static void ParseArgs(const int argc, char **argv) {
 }
 
 /**
+ * @brief Initialize the run loop
+ */
+static void InitRunLoop() {
+    // create the loop
+    gMainLoop = std::make_shared<TristLib::Event::RunLoop>();
+    gMainLoop->arm();
+
+    // set up signal handler
+    // TODO
+
+    // set up system watchdog
+    gWdog = std::make_shared<TristLib::Event::SystemWatchdog>(gMainLoop);
+}
+
+/**
  * @brief Run the deamon's main loop
  */
 static void RunMainLoop() {
-    Support::Watchdog::Start();
+    gWdog->start();
 
     while(gRun) {
         gMainLoop->run();
     }
 
-    Support::Watchdog::Stop();
+    gWdog->stop();
 }
 
 /**
@@ -119,14 +136,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Support::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
+    TristLib::Core::InitLogging(gCliConfig.logLevel, gCliConfig.logShortFormat);
     PLOG_INFO << "Starting blazeguid version " << kVersion << " (" << kVersionGitHash << ")";
 
-    // initialize the event loop, then do config initialization
-    Support::Watchdog::Init();
-
-    gMainLoop = std::make_shared<Support::EventLoop>(true);
-    gMainLoop->arm();
+    // set up run loop
+    InitRunLoop();
 
     // read config
     try {

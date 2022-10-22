@@ -3,6 +3,10 @@
 
 #include <memory>
 
+namespace TristLib::Event {
+class Timer;
+}
+
 namespace Drivers::Display {
 class Base;
 }
@@ -60,7 +64,7 @@ class DisplayManager {
         struct _cairo *ctx{nullptr};
 
         /// Display redraw timer
-        struct event *redrawTimer{nullptr};
+        std::shared_ptr<TristLib::Event::Timer> redrawTimer;
 };
 }
 
