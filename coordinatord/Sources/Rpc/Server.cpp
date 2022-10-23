@@ -3,8 +3,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <event2/event.h>
-#include <event2/buffer.h>
 #include <fmt/format.h>
 #include <TristLib/Core.h>
 #include <TristLib/Event.h>
@@ -111,17 +109,8 @@ void Server::reloadConfig() {
  * and creates a client handler for it.
  */
 void Server::acceptClient() {
-    // accept client socket
-    int fd = accept(this->listenEvent->getFd(), nullptr, nullptr);
-    if(fd == -1) {
-        throw std::system_error(errno, std::generic_category(), "accept");
-    }
-
-    // convert socket to non-blocking
-    int err = evutil_make_socket_nonblocking(fd);
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "evutil_make_socket_nonblocking");
-    }
+    // accept a client socket
+    int fd = this->listenEvent->accept();
 
     // if at capacity, close the socket again
     if(this->clients.size() > kMaxClients) {

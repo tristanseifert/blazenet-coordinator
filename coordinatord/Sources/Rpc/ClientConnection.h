@@ -1,10 +1,13 @@
 #ifndef RPC_CLIENTCONNECTION_H
 #define RPC_CLIENTCONNECTION_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
-#include <vector>
+
+#include <TristLib/Event.h>
 
 namespace Rpc {
 class Server;
@@ -21,6 +24,9 @@ class Server;
  */
 class ClientConnection {
     private:
+        /// Maximum receive packet size
+        constexpr static const size_t kMaxPacketSize{4096};
+
         /**
          * @brief Client state machine states
          */
@@ -56,7 +62,7 @@ class ClientConnection {
         void abort();
 
         void handleRead();
-        void handleEvent(const size_t eventFlags);
+        void handleEvents(const TristLib::Event::Socket::Event);
 
         void sendRaw(std::span<const std::byte> payload);
 
@@ -67,13 +73,11 @@ class ClientConnection {
         /// Whether the connection is dead, and can be garbage collected
         bool deadFlag{false};
 
-        /// Socket used to communicate with the client
-        int socket{-1};
-        /// Buffer event wrapping the socket
-        struct bufferevent *event{nullptr};
+        /// Socket connection event
+        std::shared_ptr<TristLib::Event::Socket> socket;
 
         /// Packet read buffer
-        std::vector<std::byte> rxBuffer;
+        std::array<std::byte, kMaxPacketSize> rxBuffer;
 };
 }
 

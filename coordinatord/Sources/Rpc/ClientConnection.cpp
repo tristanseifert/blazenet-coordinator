@@ -3,9 +3,6 @@
 #include <sys/socket.h>
 
 #include <cbor.h>
-#include <event2/event.h>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
 #include <fmt/format.h>
 #include <TristLib/Core.h>
 #include <TristLib/Event.h>
@@ -28,47 +25,36 @@ using namespace Rpc;
  * connection, and being notified when events take place on the connection. These events will
  * call back into the client connection instance.
  */
-ClientConnection::ClientConnection(Server *parent, const int socketFd) : server(parent),
-    socket(socketFd) {
-    // TODO: convert to TristLib listen event
-    auto evbase = TristLib::Event::RunLoop::Current()->getEvBase();
+ClientConnection::ClientConnection(Server *parent, const int socketFd) : server(parent) {
+    // set up the socket event
+    this->socket = std::make_shared<TristLib::Event::Socket>(TristLib::Event::RunLoop::Current(),
+            socketFd, true);
 
-    // create buffer event
-    auto bev = bufferevent_socket_new(evbase, socketFd, BEV_OPT_CLOSE_ON_FREE);
-    if(!bev) {
-        throw std::runtime_error("failed to create bufevent");
-    }
-
-    this->event = bev;
-
-    // configure it such that we don't get woken up til an RPC header is read
-    bufferevent_setwatermark(this->event, EV_READ, sizeof(Rpc::RequestHeader),
-            EV_RATE_LIMIT_MAX);
+    this->socket->setReadWatermark({sizeof(Rpc::RequestHeader), SIZE_MAX});
 
     // install callbacks
-    bufferevent_setcb(this->event, [](auto bev, auto ctx) {
-        auto cli = reinterpret_cast<ClientConnection *>(ctx);
+    this->socket->setReadCallback([this](auto sock) {
         try {
-            cli->handleRead();
+            this->handleRead();
         } catch(const std::exception &e) {
-            PLOG_ERROR << fmt::format("client {} read failed: {}", ctx, e.what());
-            cli->abort();
+            PLOG_ERROR << fmt::format("client {} read failed: {}", static_cast<void *>(this),
+                    e.what());
+            this->abort();
         }
-    }, nullptr, [](auto bev, auto what, auto ctx) {
-        auto cli = reinterpret_cast<ClientConnection *>(ctx);
-        try {
-            cli->handleEvent(what);
-        } catch(const std::exception &e) {
-            PLOG_ERROR << fmt::format("client {} event failed: {}", ctx, e.what());
-            cli->abort();
-        }
-    }, this);
+    });
 
-    // enable event for "client data available to read" events
-    int err = bufferevent_enable(this->event, EV_READ);
-    if(err == -1) {
-        throw std::runtime_error("failed to enable bufferevent");
-    }
+    this->socket->setEventCallback([this](auto sock, auto events) {
+        try {
+            this->handleEvents(events);
+        } catch(const std::exception &e) {
+            PLOG_ERROR << fmt::format("client {} event failed: {}", static_cast<void *>(this),
+                    e.what());
+            this->abort();
+        }
+    });
+
+    // start receiving socket events
+    this->socket->enableEvents(true, false);
 }
 
 /**
@@ -77,9 +63,7 @@ ClientConnection::ClientConnection(Server *parent, const int socketFd) : server(
  * Close the socket (if not already done) and release the libevent resources.
  */
 ClientConnection::~ClientConnection() {
-    if(this->event) {
-        bufferevent_free(this->event);
-    }
+    this->socket.reset();
 }
 
 
@@ -95,8 +79,7 @@ void ClientConnection::abort() {
     this->deadFlag = true;
 
     // delete the buffer event: this will close the socket as well
-    bufferevent_free(this->event);
-    this->event = nullptr;
+    this->socket.reset();
 }
 
 
@@ -110,16 +93,8 @@ void ClientConnection::abort() {
  * If the packet is valid, we'll attempt to CBOR decode the payload (if any.)
  */
 void ClientConnection::handleRead() {
-    // prepare the receive buffer
-    auto buf = bufferevent_get_input(this->event);
-    const size_t pending = evbuffer_get_length(buf);
-
-    this->rxBuffer.resize(pending);
-
-    auto read = evbuffer_remove(buf, static_cast<void *>(this->rxBuffer.data()), pending);
-    if(read == -1) {
-        throw std::runtime_error("evbuffer_remove failed");
-    }
+    // read out the packet
+    const auto read = this->socket->read(this->rxBuffer);
 
     // validate the header
     if(read < sizeof(RequestHeader)) {
@@ -131,9 +106,9 @@ void ClientConnection::handleRead() {
 
     if(hdr->version != kCurrentVersion) {
         throw std::runtime_error(fmt::format("invalid rpc version: ${:04x}", hdr->version));
-    } else if(hdr->length < sizeof(*hdr) || hdr->length > this->rxBuffer.size()) {
+    } else if(hdr->length < sizeof(*hdr) || hdr->length > read) {
         throw std::runtime_error(fmt::format("invalid header size ({}, have {})", hdr->length,
-                    this->rxBuffer.size()));
+                    read));
     }
 
     // get payload
@@ -187,14 +162,14 @@ void ClientConnection::handleRead() {
  * @brief Handle a client connection event
  *
  * This likely corresponds to the connection being closed, or an IO error.
- *
- * @param flags A logical OR of `BEV_EVENT_` flags
  */
-void ClientConnection::handleEvent(const size_t flags) {
+void ClientConnection::handleEvents(const TristLib::Event::Socket::Event flags) {
+    using Flags = TristLib::Event::Socket::Event;
+
     // events that will close the connection
-    if((flags & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) != 0) {
+    if((flags & (Flags::EndOfFile | Flags::UnrecoverableError)) != 0) {
         PLOG_DEBUG << fmt::format("client {}: close due to {}", static_cast<void *>(this),
-                (flags & BEV_EVENT_EOF) ? "EoF" : "IO error");
+                (flags & Flags::EndOfFile) ? "EoF" : "IO error");
         return this->abort();
     }
     // TODO: do we need to handle BEV_EVENT_READING or BEV_EVENT_WRITING?
@@ -212,9 +187,7 @@ void ClientConnection::reply(std::span<const std::byte> payload) {
     buffer.resize(sizeof(struct RequestHeader) + payload.size(), std::byte{0});
 
     // get last header
-    if(this->rxBuffer.size() < sizeof(RequestHeader)) {
-        throw std::runtime_error("invalid rx packet buffer (for tag/ep)");
-    }
+    // TODO: check that the last packet was valid?
     auto lastHdr = reinterpret_cast<const RequestHeader *>(this->rxBuffer.data());
 
     // build up the header
@@ -262,9 +235,5 @@ void ClientConnection::reply(cbor_item_t* &root) {
  * This assumes the packet already has a `struct RpcHeader` prepended.
  */
 void ClientConnection::sendRaw(std::span<const std::byte> payload) {
-    // TODO: should we write to the buffer event instead?
-    int err = write(this->socket, payload.data(), payload.size());
-    if(err == -1) {
-        throw std::system_error(errno, std::generic_category(), "write");
-    }
+    this->socket->write(payload);
 }
